@@ -15,187 +15,154 @@ const SCENE_PALETTES: Record<LandscapeTime, {
   meadowBottom: string;
   cloud: string;
 }> = {
-  day: {
-    skyTop: '#B9DCEB',
-    skyBottom: '#E8F0E8',
-    meadowTop: '#B7C7BA',
-    meadowBottom: '#AABBAE',
-    cloud: '#FFFDF8'
-  },
-  sunset: {
-    skyTop: '#C6B5CF',
-    skyBottom: '#EAC7AE',
-    meadowTop: '#AAB6A4',
-    meadowBottom: '#91A294',
-    cloud: '#FFF4E9'
-  },
-  night: {
-    skyTop: '#23323C',
-    skyBottom: '#435557',
-    meadowTop: '#455A50',
-    meadowBottom: '#34493F',
-    cloud: '#AEBCC0'
-  }
+  day: { skyTop: '#A9D4E7', skyBottom: '#E5EFE7', meadowTop: '#B8C8BB', meadowBottom: '#A9BAAD', cloud: '#FFFDFC' },
+  sunset: { skyTop: '#B9AED0', skyBottom: '#EBC6A9', meadowTop: '#AAB7A6', meadowBottom: '#93A496', cloud: '#FFF4E9' },
+  night: { skyTop: '#22333D', skyBottom: '#445A5A', meadowTop: '#465B51', meadowBottom: '#34493F', cloud: '#B9C4C5' }
 };
 
 const SEASON_COLORS: Record<LandscapeSeason, {
-  leftTree: string;
-  leftTreeDark: string;
-  rightTree: string;
-  rightTreeDark: string;
+  left: string;
+  leftDark: string;
+  right: string;
+  rightDark: string;
   fruit: string;
 }> = {
-  spring: {
-    leftTree: '#A9C58B',
-    leftTreeDark: '#91AE75',
-    rightTree: '#D6A6AE',
-    rightTreeDark: '#C28E98',
-    fruit: '#E78D83'
-  },
-  summer: {
-    leftTree: '#9FBE7D',
-    leftTreeDark: '#86A667',
-    rightTree: '#9DB873',
-    rightTreeDark: '#829D5E',
-    fruit: '#F1A34E'
-  },
-  autumn: {
-    leftTree: '#B8BF76',
-    leftTreeDark: '#9CA45E',
-    rightTree: '#D38B42',
-    rightTreeDark: '#B97232',
-    fruit: '#F29A45'
-  },
-  winter: {
-    leftTree: '#AFC779',
-    leftTreeDark: '#92AD61',
-    rightTree: '#D99A43',
-    rightTreeDark: '#BD7D31',
-    fruit: '#F49B42'
-  }
+  spring: { left: '#A9C88A', leftDark: '#8EAC70', right: '#D5A1AD', rightDark: '#BF8795', fruit: '#E68B83' },
+  summer: { left: '#A4C47F', leftDark: '#86A866', right: '#A2BB75', rightDark: '#829B5C', fruit: '#F0A04B' },
+  autumn: { left: '#B8C477', leftDark: '#98A35D', right: '#D88D42', rightDark: '#B97031', fruit: '#F29A45' },
+  winter: { left: '#B1C978', leftDark: '#91AD60', right: '#DB9841', rightDark: '#BC7930', fruit: '#F49A40' }
 };
 
 export const FoodBudLandscape: React.FC<FoodBudLandscapeProps> = ({ season, timeOfDay }) => {
   const palette = SCENE_PALETTES[timeOfDay];
-  const seasonColor = SEASON_COLORS[season];
+  const colors = SEASON_COLORS[season];
   const isWinter = season === 'winter';
   const isNight = timeOfDay === 'night';
 
   return (
     <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
-      <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" className="w-full h-full">
+      <svg viewBox="0 0 400 600" preserveAspectRatio="none" className="block w-full h-full">
         <defs>
-          <linearGradient id="foodbudSky" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="foodbudSkyFull" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={palette.skyTop} />
             <stop offset="100%" stopColor={palette.skyBottom} />
           </linearGradient>
-          <linearGradient id="foodbudMeadow" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="foodbudGroundFull" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={palette.meadowTop} />
             <stop offset="100%" stopColor={palette.meadowBottom} />
           </linearGradient>
+          <radialGradient id="foodbudSunGlow">
+            <stop offset="0%" stopColor="#FFF8A9" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#FFF8A9" stopOpacity="0" />
+          </radialGradient>
         </defs>
 
-        <rect width="400" height="500" fill="url(#foodbudSky)" />
+        {/* The sky is the base layer for the complete FoodBud screen. */}
+        <rect width="400" height="600" fill="url(#foodbudSkyFull)" />
 
         {isNight ? (
-          <g fill="#F5E9B8" opacity="0.8">
-            <circle cx="42" cy="65" r="1.5" />
-            <circle cx="106" cy="104" r="1" />
-            <circle cx="176" cy="52" r="1.3" />
-            <circle cx="242" cy="96" r="1.1" />
-            <circle cx="337" cy="61" r="1.5" />
-            <path d="M326 34a17 17 0 1 0 19 26 20 20 0 1 1-19-26Z" fill="#F2DF9F" />
+          <g>
+            <g fill="#F7EDC0" opacity="0.85">
+              <circle cx="42" cy="144" r="1.5" /><circle cx="106" cy="183" r="1" />
+              <circle cx="177" cy="129" r="1.3" /><circle cx="245" cy="172" r="1.1" />
+              <circle cx="352" cy="133" r="1.5" /><circle cx="304" cy="210" r="1" />
+            </g>
+            <path d="M332 134a19 19 0 1 0 22 29 23 23 0 1 1-22-29Z" fill="#F2DFA0" />
           </g>
         ) : (
-          <g fill={palette.cloud} opacity="0.96">
-            <path d="M17 111c1-9 10-14 18-11 5-14 25-15 32-2 11-5 25 2 26 13Z" />
-            <path d="M99 137c1-7 8-11 15-9 5-10 20-10 25 0 8-3 17 2 18 9Z" />
-            <path d="M242 112c1-8 10-13 18-10 6-13 24-14 31-2 10-4 22 2 23 12Z" />
-            <path d="M185 164c1-6 7-9 13-7 4-9 17-10 22-1 7-3 16 2 16 8Z" />
-          </g>
+          <>
+            {/* Friendly sun from the supplied reference: round face with a tiny blue flower. */}
+            <g transform="translate(337 150)">
+              <circle r="37" fill="url(#foodbudSunGlow)" />
+              <circle r="18" fill="#F8DD66" />
+              <ellipse cx="-5.5" cy="-1" rx="1.4" ry="2" fill="#7B6B43" />
+              <ellipse cx="5.5" cy="-1" rx="1.4" ry="2" fill="#7B6B43" />
+              <path d="M-3 6q3 2 6 0" fill="none" stroke="#B49143" strokeWidth="1.3" strokeLinecap="round" />
+              <g transform="translate(-12 -13)">
+                <circle cx="-3" cy="0" r="3" fill="#76BFD2" />
+                <circle cx="3" cy="0" r="3" fill="#76BFD2" />
+                <circle cy="-3" r="3" fill="#8DCBDA" />
+                <circle cy="3" r="3" fill="#8DCBDA" />
+                <circle r="2" fill="#E8B64E" />
+                <path d="M3 4q5 3 4 8" fill="none" stroke="#79A06A" strokeWidth="1.5" />
+              </g>
+            </g>
+
+            <g fill={palette.cloud} opacity="0.97">
+              <path d="M12 176c1-10 11-16 21-12 6-16 28-17 36-2 13-6 28 2 29 14Z" />
+              <path d="M91 216c1-7 9-12 16-9 5-11 21-12 27-1 9-4 19 2 20 10Z" />
+              <path d="M238 205c1-9 11-15 20-11 6-15 27-16 35-2 11-5 25 2 26 13Z" />
+            </g>
+          </>
         )}
 
-        <g transform="translate(0 6)">
-          <path d="M0 250H400V500H0Z" fill="url(#foodbudMeadow)" />
+        {/* Ground reaches the very bottom, including the area behind the controls. */}
+        <path d="M0 314Q95 300 200 310T400 304V600H0Z" fill="url(#foodbudGroundFull)" />
 
-          <g opacity="0.96">
-            <rect x="0" y="244" width="400" height="5" rx="2" fill="#FFFDF8" />
-            <rect x="0" y="258" width="400" height="5" rx="2" fill="#FFFDF8" />
-            {Array.from({ length: 24 }, (_, index) => {
-              const x = index * 18 - 7;
-              return <path key={x} d={`M${x} 239l5-7 5 7v29H${x}Z`} fill="#FFFDF8" />;
-            })}
-          </g>
+        {/* Fence sits behind the mascot and remains above the control dock. */}
+        <g opacity="0.97">
+          <rect x="0" y="354" width="400" height="5" rx="2" fill="#FFFDFC" />
+          <rect x="0" y="372" width="400" height="5" rx="2" fill="#FFFDFC" />
+          {Array.from({ length: 24 }, (_, index) => {
+            const x = index * 18 - 8;
+            return <path key={x} d={`M${x} 348l5-8 5 8v37H${x}Z`} fill="#FFFDFC" />;
+          })}
+        </g>
 
-          {/* Tall green fruit tree from the reference */}
-          <g transform="translate(8 -5)">
-            <path d="M63 287c4-52 3-105 6-154h10c3 50 2 102 7 154Z" fill="#795A3A" />
-            <path d="M74 207 48 170M75 225l30-39M74 183l-15-28" fill="none" stroke="#795A3A" strokeWidth="5" strokeLinecap="round" />
-            <ellipse cx="74" cy="157" rx="43" ry="59" fill={seasonColor.leftTree} />
-            <ellipse cx="44" cy="188" rx="23" ry="17" fill={seasonColor.leftTreeDark} />
-            <ellipse cx="108" cy="179" rx="22" ry="16" fill={seasonColor.leftTreeDark} />
-            <ellipse cx="111" cy="222" rx="25" ry="18" fill={seasonColor.leftTree} />
-            {isWinter && (
-              <g fill="#FFFDF8">
-                <path d="M34 145c3-22 22-35 41-33 21 1 36 14 39 33-10 9-22 3-31 9-12-7-23 4-34-3-7 3-12 1-15-6Z" />
-                <path d="M20 183c3-12 14-18 26-17 11 0 21 6 23 17-8 7-15 2-23 7-8-5-17 3-26-2Z" />
-                <path d="M88 215c3-12 14-18 25-17 12 0 21 6 24 17-8 7-16 2-23 7-9-5-18 3-26-2Z" />
-              </g>
-            )}
-            <circle cx="50" cy="204" r="7" fill={seasonColor.fruit} />
-            <path d="M49 196q6-5 9 0" fill="none" stroke="#728B55" strokeWidth="2" />
-            <circle cx="110" cy="234" r="7" fill="#D85C59" />
-            <path d="M108 226q6-5 9 0" fill="none" stroke="#728B55" strokeWidth="2" />
-          </g>
-
-          {/* Wide ochre orchard tree from the reference */}
-          <g transform="translate(195 8)">
-            <path d="M116 286c5-38 4-61 8-82 12-10 24-19 40-25-10 12-20 22-32 31 0 23 3 49 8 76Z" fill="#745035" />
-            <path d="M128 219c-14-14-34-23-52-27M129 236c15-12 32-18 49-19" fill="none" stroke="#745035" strokeWidth="7" strokeLinecap="round" />
-            <ellipse cx="69" cy="171" rx="46" ry="33" fill={seasonColor.rightTree} />
-            <ellipse cx="42" cy="208" rx="35" ry="27" fill={seasonColor.rightTreeDark} />
-            <ellipse cx="124" cy="204" rx="69" ry="43" fill={seasonColor.rightTree} />
-            <ellipse cx="84" cy="239" rx="48" ry="31" fill={seasonColor.rightTreeDark} />
-            <ellipse cx="174" cy="238" rx="45" ry="30" fill={seasonColor.rightTreeDark} />
-            {isWinter && (
-              <g fill="#FFFDF8">
-                <path d="M24 162c5-22 26-32 47-31 23 0 40 12 44 31-13 9-23 4-34 9-11-6-24 2-36-4-8 2-15 0-21-5Z" />
-                <path d="M73 192c7-27 39-41 70-39 28 1 50 15 55 39-15 10-31 4-44 11-18-7-34 3-49-4-13 4-22 1-32-7Z" />
-                <path d="M38 228c5-17 24-25 43-24 18 0 34 9 38 24-11 8-21 3-30 8-12-6-24 3-34-3-7 2-12 0-17-5Z" />
-                <path d="M145 228c5-16 23-24 41-23 17 0 31 8 35 23-10 7-19 3-28 7-11-5-22 2-31-3-7 2-12 0-17-4Z" />
-              </g>
-            )}
-            {[['53','216'], ['96','229'], ['142','210'], ['176','246']].map(([cx, cy]) => (
-              <g key={`${cx}-${cy}`}>
-                <circle cx={cx} cy={cy} r="7" fill={seasonColor.fruit} />
-                <path d={`M${Number(cx) - 2} ${Number(cy) - 7}q5-5 9 0`} fill="none" stroke="#71814C" strokeWidth="2" />
-              </g>
-            ))}
-          </g>
-
-          {isWinter ? (
-            <g transform="translate(57 350)">
-              <ellipse cx="0" cy="18" rx="12" ry="13" fill="#FFFDF8" />
-              <circle cy="1" r="9" fill="#FFFDF8" />
-              <circle cx="-3" cy="-1" r="1.4" fill="#38342F" />
-              <circle cx="3" cy="-1" r="1.4" fill="#38342F" />
-              <path d="M0 1l-8 3h8Z" fill="#E68B3B" />
-              <path d="M-8 8q8 6 16 0" fill="none" stroke="#B54D4D" strokeWidth="4" />
-            </g>
-          ) : (
-            <g transform="translate(58 365)" fill="#FFFDF8">
-              <circle cx="-5" r="6" /><circle cx="5" r="6" /><circle cy="-5" r="6" /><circle cy="5" r="6" />
-              <circle r="4" fill="#E4B64C" />
+        {/* Tall fruit tree, kept fully to the left of the mascot. */}
+        <g transform="translate(0 72)">
+          <path d="M65 366c5-65 4-135 7-210h11c3 73 2 145 8 210Z" fill="#7B5939" />
+          <path d="M77 276 47 225M78 300l35-49M77 239l-18-39" fill="none" stroke="#7B5939" strokeWidth="6" strokeLinecap="round" />
+          <ellipse cx="78" cy="213" rx="47" ry="72" fill={colors.left} />
+          <ellipse cx="42" cy="257" rx="25" ry="19" fill={colors.leftDark} />
+          <ellipse cx="115" cy="244" rx="24" ry="18" fill={colors.leftDark} />
+          <ellipse cx="119" cy="300" rx="28" ry="20" fill={colors.left} />
+          {isWinter && (
+            <g fill="#FFFDFC">
+              <path d="M31 199c3-25 25-40 47-38 24 1 42 16 45 38-11 10-24 4-35 10-13-7-25 5-38-3-8 4-15 1-19-7Z" />
+              <path d="M17 252c3-13 16-21 29-20 13 0 24 7 27 20-9 7-18 2-26 8-10-6-20 3-30-3Z" />
+              <path d="M92 293c3-13 16-20 29-19 13 0 24 7 27 19-9 8-18 3-27 8-9-5-20 3-29-2Z" />
             </g>
           )}
+          <circle cx="50" cy="276" r="7" fill={colors.fruit} /><path d="M49 268q6-5 10 0" fill="none" stroke="#728B55" strokeWidth="2" />
+          <circle cx="118" cy="315" r="7" fill="#D95D59" /><path d="M116 307q6-5 10 0" fill="none" stroke="#728B55" strokeWidth="2" />
+        </g>
 
-          <g transform="translate(338 352)" fill="#FFFDF8">
-            <circle cx="-6" r="6" /><circle cx="6" r="6" /><circle cy="-6" r="6" /><circle cy="6" r="6" />
-            <circle r="4.5" fill="#E4B64C" />
+        {/* Broad ochre tree, roots visible above the interaction controls. */}
+        <g transform="translate(191 84)">
+          <path d="M119 345c6-48 5-80 10-106 13-12 27-22 45-30-11 15-23 28-37 39 0 28 4 61 10 97Z" fill="#765035" />
+          <path d="M132 258c-16-17-38-28-59-33M134 279c17-15 37-22 56-23" fill="none" stroke="#765035" strokeWidth="8" strokeLinecap="round" />
+          <ellipse cx="68" cy="201" rx="48" ry="35" fill={colors.right} />
+          <ellipse cx="38" cy="245" rx="37" ry="29" fill={colors.rightDark} />
+          <ellipse cx="130" cy="238" rx="72" ry="47" fill={colors.right} />
+          <ellipse cx="85" cy="283" rx="51" ry="34" fill={colors.rightDark} />
+          <ellipse cx="181" cy="280" rx="47" ry="32" fill={colors.rightDark} />
+          {isWinter && (
+            <g fill="#FFFDFC">
+              <path d="M20 193c6-24 28-35 50-34 25 0 43 13 47 34-13 10-25 4-36 10-13-7-26 2-39-4-9 3-16 0-22-6Z" />
+              <path d="M75 224c8-30 43-45 75-43 31 1 54 17 59 43-16 11-33 5-48 12-19-8-37 3-53-4-14 4-24 1-33-8Z" />
+              <path d="M38 271c5-19 26-28 47-27 20 0 37 10 41 27-12 8-23 3-33 9-13-6-26 3-37-3-8 3-14 0-18-6Z" />
+              <path d="M151 270c5-18 25-27 45-26 19 0 35 10 39 26-11 8-21 3-31 8-12-6-24 3-34-3-8 2-14 0-19-5Z" />
+            </g>
+          )}
+          {[[49,258], [99,274], [151,250], [188,291]].map(([cx, cy]) => (
+            <g key={`${cx}-${cy}`}><circle cx={cx} cy={cy} r="7" fill={colors.fruit} /><path d={`M${cx - 2} ${cy - 7}q5-5 10 0`} fill="none" stroke="#71814C" strokeWidth="2" /></g>
+          ))}
+        </g>
+
+        {/* Small decorations stay in the visible side pockets, never under the buttons. */}
+        {isWinter ? (
+          <g transform="translate(57 445)">
+            <ellipse cy="16" rx="12" ry="13" fill="#FFFDFC" /><circle r="9" fill="#FFFDFC" />
+            <circle cx="-3" cy="-2" r="1.4" fill="#38342F" /><circle cx="3" cy="-2" r="1.4" fill="#38342F" />
+            <path d="M0 0l-8 3h8Z" fill="#E68B3B" /><path d="M-8 7q8 6 16 0" fill="none" stroke="#B54D4D" strokeWidth="4" />
           </g>
+        ) : null}
+        <g transform="translate(348 397)" fill="#FFFDFC">
+          <circle cx="-6" r="6" /><circle cx="6" r="6" /><circle cy="-6" r="6" /><circle cy="6" r="6" />
+          <circle r="4.5" fill="#E4B64C" />
         </g>
       </svg>
     </div>
   );
 };
-

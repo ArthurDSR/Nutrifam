@@ -746,6 +746,8 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
 
   return (
     <div className="flex-1 flex flex-col relative select-none overflow-hidden pb-3 bg-[#B7C7BA]">
+      <FoodBudLandscape season={currentSeason} timeOfDay={currentTimeOfDay} />
+
       {/* Top Status Header - Redesigned Clean HUD */}
       <div className="px-4 pt-3.5 z-10 space-y-2">
         {/* Tier 1: Identity & Currency Bar */}
@@ -868,31 +870,6 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
 
       {/* Scenic Nature Garden with FoodBud & Unified Controls */}
       <div className="flex-1 relative flex flex-col justify-between overflow-hidden">
-        {/* Floating Seasonal Atmospheric Particles */}
-        <div className="absolute inset-x-0 top-10 pointer-events-none z-10 flex justify-around opacity-75">
-          {currentSeason === 'spring' && (
-            <>
-              <span className="text-base animate-bounce" style={{ animationDuration: '4s' }}>🌸</span>
-              <span className="text-xs animate-bounce" style={{ animationDuration: '3.2s', animationDelay: '0.8s' }}>🌸</span>
-              <span className="text-sm animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '1.5s' }}>🌸</span>
-            </>
-          )}
-          {currentSeason === 'autumn' && (
-            <>
-              <span className="text-base animate-bounce" style={{ animationDuration: '4.2s' }}>🍂</span>
-              <span className="text-sm animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1s' }}>🍁</span>
-              <span className="text-xs animate-bounce" style={{ animationDuration: '4.8s', animationDelay: '1.8s' }}>🍂</span>
-            </>
-          )}
-          {currentSeason === 'winter' && (
-            <>
-              <span className="text-sm animate-bounce" style={{ animationDuration: '3.8s' }}>❄️</span>
-              <span className="text-xs animate-bounce" style={{ animationDuration: '3s', animationDelay: '0.7s' }}>❄️</span>
-              <span className="text-base animate-bounce" style={{ animationDuration: '4.4s', animationDelay: '1.4s' }}>❄️</span>
-            </>
-          )}
-        </div>
-
         {/* Action toast feedback */}
         {petActionEffect && (
           <div className="absolute top-4 inset-x-0 flex justify-center z-30">
@@ -902,14 +879,12 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
           </div>
         )}
 
-        <FoodBudLandscape season={currentSeason} timeOfDay={currentTimeOfDay} />
-
-        {/* Center: FoodBud Mascot Sitting in Meadow */}
-        <div className="flex-1 flex flex-col items-center justify-center relative z-10 pt-4 pb-1">
+        {/* Mascot is anchored to the meadow instead of vertically centered. */}
+        <div className="absolute inset-x-0 bottom-[152px] z-10 flex justify-center pointer-events-none">
           {/* Guaxinim Container (Clickable affection interaction) */}
           <div
             onClick={handlePetCarinho}
-            className={`relative flex flex-col items-center cursor-pointer transition-all duration-300 group ${
+            className={`relative flex flex-col items-center cursor-pointer pointer-events-auto transition-all duration-300 group ${
               mood === 'playing' ? 'animate-bounce' : 'active:scale-95'
             }`}
             title="Clique no Guaxinim para fazer carinho!"
@@ -956,7 +931,7 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
           </div>
         </div>
         {/* Bottom Controls Area (Floating harmoniously on the lush meadow) */}
-        <div className="relative z-20 flex flex-col gap-2.5 px-5 pb-3">
+        <div className="relative z-20 flex flex-col gap-2.5 px-5 pb-3 mt-auto">
           {/* Direct Interactive Action Bar with elevated shadow dock */}
           <div className="flex items-center justify-center">
             <div
