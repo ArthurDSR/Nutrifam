@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --app-canvas-bg: #F7F4EE;
+    --app-card-bg: #FFFCF7;
+    --app-surface-muted: #EFEDE6;
+    --app-text-main: #3F4B46;
+    --app-text-muted: #6F7C76;
+    --app-border: #D8DED9;
+    color-scheme: light;
+  }
+
+  .dark {
+    --app-canvas-bg: #18201D;
+    --app-card-bg: #232D29;
+    --app-surface-muted: #2A3530;
+    --app-text-main: #EDF2EF;
+    --app-text-muted: #A8B8B1;
+    --app-border: #394842;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--app-canvas-bg);
+    color: var(--app-text-main);
+    -webkit-tap-highlight-color: transparent;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-variant-numeric: tabular-nums;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--color-secondary-primary, #6F8F80) 42%, transparent);
+    outline-offset: 2px;
+  }
+}
+
+/* Cozy Pastel soft elevation shadows without harsh black */
+.shadow-cozy {
+  box-shadow: 0 14px 32px -20px rgba(73, 91, 82, 0.32), 0 4px 14px -8px rgba(73, 91, 82, 0.2);
+}
+.dark .shadow-cozy {
+  box-shadow: 0 16px 36px -18px rgba(4, 10, 7, 0.72), 0 5px 16px -8px rgba(4, 10, 7, 0.55);
+}
+
+.app-canvas { background-color: var(--app-canvas-bg); color: var(--app-text-main); }
+.app-card { background-color: var(--app-card-bg); color: var(--app-text-main); border-color: var(--app-border); }
+.app-muted { color: var(--app-text-muted); }
+
+.onboarding-primary-action {
+  background: var(--color-secondary-primary, #6F8F80);
+  box-shadow: 0 12px 26px -14px color-mix(in srgb, var(--color-secondary-primary, #6F8F80) 72%, transparent);
+}
+
+.onboarding-light .bg-white\/5,
+.onboarding-light .bg-white\/10,
+.onboarding-light .bg-white\/15,
+.onboarding-light .bg-white\/20,
+.onboarding-light .bg-slate-900\/60 {
+  background-color: rgba(255, 252, 247, 0.86) !important;
+}
+
+.onboarding-light .text-white,
+.onboarding-light .text-slate-100,
+.onboarding-light .text-slate-200,
+.onboarding-light .text-slate-300 {
+  color: #3F4B46 !important;
+}
+
+.onboarding-light .text-slate-400 {
+  color: #6F7C76 !important;
+}
+
+.onboarding-light .border-white\/10,
+.onboarding-light .border-white\/15,
+.onboarding-light .border-slate-700\/80 {
+  border-color: #D8DED9 !important;
+}
+
+.onboarding-shell .bg-emerald-400,
+.onboarding-shell .bg-emerald-500,
+.onboarding-shell .bg-emerald-600,
+.onboarding-shell .bg-emerald-600\/80 {
+  background-color: var(--color-secondary-primary, #6F8F80) !important;
+}
+
+.onboarding-shell .text-emerald-300,
+.onboarding-shell .text-emerald-400,
+.onboarding-shell .text-emerald-400\/80 {
+  color: var(--color-secondary-dark-text, #BDD2C7) !important;
+}
+
+.onboarding-light .text-emerald-300,
+.onboarding-light .text-emerald-400,
+.onboarding-light .text-emerald-400\/80 {
+  color: var(--color-secondary-text, #405D50) !important;
+}
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--app-border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--app-text-muted);
+}
+
+/* Safe area padding utilities */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 16px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}

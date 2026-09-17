@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs and caches
+*.log
+.vite/
+coverage/
+
+# Local Codex configuration and downloaded skills
+.agents/
+.codex/
+skills-lock.json
