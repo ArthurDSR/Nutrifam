@@ -122,13 +122,20 @@ export async function registerAccount(
         });
 
         if (error) {
-          if (error.message.toLowerCase().includes('already registered') || error.status === 422) {
+          const lower = error.message.toLowerCase();
+          if (lower.includes('already registered') || lower.includes('already in use') || error.status === 422) {
             return {
               success: false,
               message: 'Este e-mail já está cadastrado no sistema. Por favor, faça login.'
             };
           }
-          return { success: false, message: `Erro ao criar conta: ${error.message}` };
+          if (lower.includes('rate limit') || lower.includes('over_email_send_rate_limit')) {
+            return {
+              success: false,
+              message: 'Limite temporário de envio de e-mails do Supabase atingido. Tente novamente em alguns minutos.'
+            };
+          }
+          return { success: false, message: `Erro ao criar conta no Supabase: ${error.message}` };
         }
 
         if (data.user) {
@@ -233,13 +240,26 @@ export async function loginAccount(
         });
 
         if (error) {
+          const lower = error.message.toLowerCase();
           if (
-            error.message.toLowerCase().includes('invalid login credentials') ||
-            error.message.toLowerCase().includes('invalid credentials')
+            lower.includes('invalid login credentials') ||
+            lower.includes('invalid credentials')
           ) {
             return {
               success: false,
               message: 'E-mail ou senha incorretos. Verifique os dados e tente novamente.'
+            };
+          }
+          if (lower.includes('email not confirmed')) {
+            return {
+              success: false,
+              message: 'Seu cadastro precisa de confirmação de e-mail antes do primeiro login. Verifique sua caixa de entrada ou spam.'
+            };
+          }
+          if (lower.includes('rate limit')) {
+            return {
+              success: false,
+              message: 'Muitas tentativas de login consecutivas. Aguarde alguns segundos e tente novamente.'
             };
           }
           return { success: false, message: error.message };

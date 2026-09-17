@@ -13,8 +13,17 @@ type NutriFamGlobal = typeof globalThis & {
 const globalCache = globalThis as NutriFamGlobal;
 
 export function getSupabaseCredentials(): { url: string; anonKey: string } {
-  const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-  const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+  const metaEnv = (import.meta as any).env || {};
+  const envUrl =
+    metaEnv.VITE_SUPABASE_URL ||
+    metaEnv.SUPABASE_URL ||
+    metaEnv.NEXT_PUBLIC_SUPABASE_URL ||
+    '';
+  const envKey =
+    metaEnv.VITE_SUPABASE_ANON_KEY ||
+    metaEnv.SUPABASE_ANON_KEY ||
+    metaEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    '';
 
   const localUrl = localStorage.getItem(STORAGE_URL_KEY) || localStorage.getItem(LEGACY_STORAGE_URL_KEY) || '';
   const localKey = localStorage.getItem(STORAGE_KEY_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY_KEY) || '';

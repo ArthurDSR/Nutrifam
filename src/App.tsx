@@ -174,6 +174,21 @@ export const App: React.FC = () => {
 
   // Check Supabase session, Google/Apple OAuth return callback & local auth session on mount
   useEffect(() => {
+    // Detect URL error parameters from Supabase redirect (e.g. invalid redirect_uri or expired link)
+    const urlHash = window.location.hash;
+    const urlSearch = window.location.search;
+    if (urlHash.includes('error_description=') || urlSearch.includes('error_description=')) {
+      const rawParams = urlHash.includes('error_description=')
+        ? urlHash.replace(/^#/, '')
+        : urlSearch.replace(/^\?/, '');
+      const params = new URLSearchParams(rawParams);
+      const desc = params.get('error_description');
+      if (desc) {
+        setHealthSyncToast(`Supabase: ${decodeURIComponent(desc.replace(/\+/g, ' '))}`);
+        setTimeout(() => setHealthSyncToast(null), 8000);
+      }
+    }
+
     // 1. Supabase OAuth & Session listener
     if (isSupabaseConfigured()) {
       const client = getSupabase();
@@ -198,6 +213,8 @@ export const App: React.FC = () => {
               window.history.replaceState({}, document.title, window.location.pathname);
             }
           }
+        }).catch((err) => {
+          console.warn('Supabase getSession notice:', err);
         });
 
         const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
