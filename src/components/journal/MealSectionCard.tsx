@@ -3,6 +3,7 @@ import { Plus, Trash2, ChevronRight } from 'lucide-react';
 import { Meal, MealType, LoggedFoodItem } from '../../types';
 import { useTranslation } from '../../services/i18n';
 import { useTheme } from '../../services/themeService';
+import { BreakfastIcon, LunchIcon, DinnerIcon, SnackIcon } from './MealSvgIcons';
 
 interface MealSectionCardProps {
   meal: Meal;
@@ -43,30 +44,26 @@ export const MealSectionCard: React.FC<MealSectionCardProps> = ({
     switch (meal.type) {
       case 'breakfast':
         return (
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50/70 dark:from-amber-950/40 dark:to-orange-950/30 flex items-center justify-center relative text-2xl shadow-2xs border border-amber-200/50 dark:border-amber-700/40 shrink-0">
-            <span>☕</span>
-            <span className="absolute -bottom-1 -right-1 text-xs">🥐</span>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50/70 dark:from-amber-950/40 dark:to-orange-950/30 flex items-center justify-center p-1.5 relative shadow-2xs border border-amber-200/50 dark:border-amber-700/40 shrink-0">
+            <BreakfastIcon className="w-full h-full" />
           </div>
         );
       case 'lunch':
         return (
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/70 dark:from-emerald-950/40 dark:to-teal-950/30 flex items-center justify-center relative text-2xl shadow-2xs border border-emerald-200/50 dark:border-emerald-700/40 shrink-0">
-            <span>🍽️</span>
-            <span className="absolute -bottom-1 -right-1 text-xs">🥗</span>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/70 dark:from-emerald-950/40 dark:to-teal-950/30 flex items-center justify-center p-1.5 relative shadow-2xs border border-emerald-200/50 dark:border-emerald-700/40 shrink-0">
+            <LunchIcon className="w-full h-full" />
           </div>
         );
       case 'dinner':
         return (
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-indigo-50/70 dark:from-sky-950/40 dark:to-indigo-950/30 flex items-center justify-center relative text-2xl shadow-2xs border border-sky-200/50 dark:border-sky-700/40 shrink-0">
-            <span>🍲</span>
-            <span className="absolute -bottom-1 -right-1 text-xs">🥦</span>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-indigo-50/70 dark:from-sky-950/40 dark:to-indigo-950/30 flex items-center justify-center p-1.5 relative shadow-2xs border border-sky-200/50 dark:border-sky-700/40 shrink-0">
+            <DinnerIcon className="w-full h-full" />
           </div>
         );
       case 'snacks':
         return (
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50/70 dark:from-purple-950/40 dark:to-pink-950/30 flex items-center justify-center relative text-2xl shadow-2xs border border-purple-200/50 dark:border-purple-700/40 shrink-0">
-            <span>🥣</span>
-            <span className="absolute -bottom-1 -right-1 text-xs">🥝</span>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50/70 dark:from-purple-950/40 dark:to-pink-950/30 flex items-center justify-center p-1.5 relative shadow-2xs border border-purple-200/50 dark:border-purple-700/40 shrink-0">
+            <SnackIcon className="w-full h-full" />
           </div>
         );
     }

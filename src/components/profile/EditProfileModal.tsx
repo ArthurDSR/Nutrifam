@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { X, Check, Calculator, Camera, Trash2 } from 'lucide-react';
+import { X, Check, Calculator, Camera, Trash2, Loader2 } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { calculateNutrition } from '../../services/nutritionCalculator';
 import { useTheme } from '../../services/themeService';
+import { uploadAvatarImage } from '../../services/supabaseClient';
 
 interface EditProfileModalProps {
   profile: UserProfile;
@@ -21,15 +22,30 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [name, setName] = useState(profile.name);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl || '');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Reset input value to allow selecting same file again if needed
+    e.target.value = '';
+
+    setIsUploadingPhoto(true);
+    setUploadError(null);
+
+    try {
+      const result = await uploadAvatarImage(file, profile.id);
+      if (result.success && result.url) {
+        setAvatarUrl(result.url);
+      } else if (result.error) {
+        setUploadError(result.error);
+      }
+    } catch (err: any) {
+      setUploadError(err.message || 'Falha ao processar a foto.');
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -90,7 +106,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           <div className="flex flex-col items-center justify-center pt-1 pb-2">
             <div className="relative">
               <div
-                className="w-20 h-20 rounded-[26px] border-[2.5px] shadow-sm flex items-center justify-center text-3xl font-black transition-all overflow-hidden"
+                className="relative w-20 h-20 rounded-[26px] border-[2.5px] shadow-sm flex items-center justify-center text-3xl font-black transition-all overflow-hidden"
                 style={{
                   background: isDark
                     ? `linear-gradient(135deg, ${activeColor.darkBg} 0%, #18201D 100%)`
@@ -111,11 +127,19 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 ) : (
                   <span className="select-none tracking-tight">{(name.trim() || 'U')[0].toUpperCase()}</span>
                 )}
+
+                {isUploadingPhoto && (
+                  <div className="absolute inset-0 bg-black/50 backdrop-blur-xs flex flex-col items-center justify-center text-white z-10">
+                    <Loader2 className="w-6 h-6 animate-spin text-white stroke-[2.5]" />
+                    <span className="text-[9px] font-bold mt-1 text-white/90">Enviando...</span>
+                  </div>
+                )}
               </div>
               <button
                 type="button"
+                disabled={isUploadingPhoto}
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full shadow-md flex items-center justify-center transition-transform active:scale-90 border-2"
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full shadow-md flex items-center justify-center transition-transform active:scale-90 border-2 disabled:opacity-50"
                 style={{
                   backgroundColor: activeColor.primary,
                   borderColor: isDark ? '#232D29' : '#ffffff',
@@ -124,26 +148,32 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 aria-label="Escolher foto"
                 title="Escolher foto"
               >
-                <Camera className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                {isUploadingPhoto ? (
+                  <Loader2 className="w-3.5 h-3.5 text-white animate-spin stroke-[2.5]" />
+                ) : (
+                  <Camera className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                )}
               </button>
             </div>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              disabled={isUploadingPhoto}
               onChange={handlePhotoUpload}
               className="hidden"
             />
             <div className="flex items-center gap-3 mt-2">
               <button
                 type="button"
+                disabled={isUploadingPhoto}
                 onClick={() => fileInputRef.current?.click()}
-                className="text-[11px] font-bold transition-opacity hover:opacity-80"
+                className="text-[11px] font-bold transition-opacity hover:opacity-80 disabled:opacity-50"
                 style={{ color: activeColor.primary }}
               >
-                {avatarUrl ? 'Trocar foto' : 'Adicionar foto'}
+                {isUploadingPhoto ? 'Processando foto...' : avatarUrl ? 'Trocar foto' : 'Adicionar foto'}
               </button>
-              {avatarUrl && (
+              {avatarUrl && !isUploadingPhoto && (
                 <button
                   type="button"
                   onClick={() => setAvatarUrl('')}
@@ -154,6 +184,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </button>
               )}
             </div>
+            {uploadError && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1.5 font-medium text-center px-4 leading-tight">
+                {uploadError}
+              </p>
+            )}
           </div>
           <div>
             <label className="font-bold text-[#3F4B46] dark:text-[#EDF2EF] block mb-1">Nome</label>

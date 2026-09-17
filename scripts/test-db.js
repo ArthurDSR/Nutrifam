@@ -74,9 +74,9 @@ async function runDatabaseTest() {
 
   // Check columns on profiles if table exists
   if (!missingTables.includes('profiles')) {
-    process.stdout.write(`⏳ Checando novas colunas em "profiles" (pet_name, equipped_clothes, show_splash_animation)... `);
+    process.stdout.write(`⏳ Checando novas colunas em "profiles" (pet_name, equipped_clothes, show_splash_animation, avatar_url)... `);
     try {
-      const { data, error } = await supabase.from('profiles').select('id, pet_name, equipped_clothes, show_splash_animation').limit(1);
+      const { data, error } = await supabase.from('profiles').select('id, pet_name, equipped_clothes, show_splash_animation, avatar_url').limit(1);
       if (error) {
         console.log(`⚠️ Faltam colunas: ${error.message}`);
       } else {
@@ -85,6 +85,24 @@ async function runDatabaseTest() {
     } catch (e) {
       console.log(`⚠️ Falha ao checar colunas: ${e.message}`);
     }
+  }
+
+  // Check storage bucket 'avatars'
+  process.stdout.write(`⏳ Checando Bucket de Fotos de Perfil no Storage ("avatars")... `);
+  try {
+    const { data: buckets, error: bErr } = await supabase.storage.listBuckets();
+    if (bErr) {
+      console.log(`⚠️ ERRO (${bErr.message})`);
+    } else {
+      const hasAvatars = buckets?.some((b) => b.name === 'avatars' || b.id === 'avatars');
+      if (hasAvatars) {
+        console.log('✅ OK (Bucket "avatars" ativo e público)');
+      } else {
+        console.log('⚠️ PENDENTE (Execute a migration no SQL Editor do Supabase para criar o bucket)');
+      }
+    }
+  } catch (e) {
+    console.log(`⚠️ Falha ao checar storage: ${e.message}`);
   }
 
   console.log('\n---------------------------------------------------------');

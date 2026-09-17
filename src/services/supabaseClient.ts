@@ -150,6 +150,7 @@ export async function loadProfileFromSupabase(userId?: string): Promise<UserProf
       email: data.email,
       name: data.name,
       avatarText: data.avatar_text || 'A',
+      avatarUrl: data.avatar_url || undefined,
       goalType: data.goal_type || 'Lose weight',
       heightCm: Number(data.height_cm) || 0,
       startWeightKg: sanitizedStart,
@@ -199,6 +200,7 @@ export async function saveProfileToSupabase(profile: UserProfile, userId?: strin
       id: targetId,
       name: profile.name,
       avatar_text: profile.avatarText,
+      avatar_url: profile.avatarUrl || null,
       goal_type: profile.goalType,
       height_cm: profile.heightCm,
       start_weight_kg: profile.startWeightKg,
@@ -239,6 +241,128 @@ export async function saveProfileToSupabase(profile: UserProfile, userId?: strin
   } catch (err) {
     console.warn('Error saving profile to Supabase:', err);
     return false;
+  }
+}
+
+/**
+ * Redimensiona e comprime uma imagem no navegador utilizando HTML Canvas.
+ * Limita as dimensões a no máximo 800x800 e comprime com qualidade JPEG 0.85,
+ * reduzindo fotos pesadas de câmera (5MB+) para ~80KB para uploads ultrarrápidos.
+ */
+export async function compressAvatarImage(
+  file: File | Blob,
+  maxDimension = 800,
+  quality = 0.85
+): Promise<{ blob: Blob; dataUrl: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Erro ao ler o arquivo de imagem.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Formato de imagem inválido ou corrompido.'));
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Não foi possível inicializar o renderizador de imagem.'));
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve({ blob, dataUrl });
+            } else {
+              resolve({ blob: file, dataUrl });
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Envia uma foto de perfil para o Supabase Storage (bucket 'avatars').
+ * Inclui compressão client-side prévia automática.
+ * Se o bucket ainda não tiver sido criado no banco ou o usuário estiver offline,
+ * retorna a imagem comprimida em Data URL Base64 com resiliência total.
+ */
+export async function uploadAvatarImage(
+  file: File | Blob,
+  userId?: string
+): Promise<{ success: boolean; url: string; error?: string }> {
+  try {
+    // 1. Compressão client-side
+    const { blob, dataUrl } = await compressAvatarImage(file, 800, 0.85);
+
+    const client = getSupabase();
+    const targetUserId = userId || (await getActiveUserId()) || 'local_user';
+
+    // 2. Se o Supabase não estiver configurado ou usuário não autenticado, usa Data URL Base64
+    if (!client || targetUserId === 'local_user') {
+      return { success: true, url: dataUrl };
+    }
+
+    // 3. Caminho do arquivo: {userId}/avatar_{timestamp}.jpg
+    const fileExt = 'jpg';
+    const filePath = `${targetUserId}/avatar_${Date.now()}.${fileExt}`;
+
+    // 4. Upload para o bucket 'avatars'
+    const { error: uploadError } = await client.storage
+      .from('avatars')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'image/jpeg'
+      });
+
+    if (uploadError) {
+      console.warn('Supabase storage upload error, fallback para dataUrl:', uploadError.message);
+      return {
+        success: true,
+        url: dataUrl,
+        error: uploadError.message
+      };
+    }
+
+    // 5. Obter URL pública do Supabase Storage
+    const { data } = client.storage.from('avatars').getPublicUrl(filePath);
+    if (data?.publicUrl) {
+      return { success: true, url: data.publicUrl };
+    }
+
+    return { success: true, url: dataUrl };
+  } catch (err: any) {
+    console.error('Erro no upload de avatar:', err);
+    return {
+      success: false,
+      url: '',
+      error: err.message || 'Erro ao processar imagem.'
+    };
   }
 }
 

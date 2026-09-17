@@ -9,6 +9,7 @@ import { MyFoodsView } from './MyFoodsView';
 import { FoodDetailModal } from './FoodDetailModal';
 import { useTranslation } from '../../services/i18n';
 import { useTheme } from '../../services/themeService';
+import { BreakfastIcon, LunchIcon, DinnerIcon, SnackIcon } from '../journal/MealSvgIcons';
 
 interface AddFoodModalProps {
   meal: Meal;
@@ -76,13 +77,29 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
   const renderMealHeaderIcon = () => {
     switch (meal.type) {
       case 'breakfast':
-        return <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl shadow-xs">☕</div>;
+        return (
+          <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center p-1 shadow-xs">
+            <BreakfastIcon className="w-full h-full" />
+          </div>
+        );
       case 'lunch':
-        return <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl shadow-xs">🍽️</div>;
+        return (
+          <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center p-1 shadow-xs">
+            <LunchIcon className="w-full h-full" />
+          </div>
+        );
       case 'dinner':
-        return <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl shadow-xs">🍲</div>;
+        return (
+          <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center p-1 shadow-xs">
+            <DinnerIcon className="w-full h-full" />
+          </div>
+        );
       case 'snacks':
-        return <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl shadow-xs">🥣</div>;
+        return (
+          <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center p-1 shadow-xs">
+            <SnackIcon className="w-full h-full" />
+          </div>
+        );
     }
   };
 

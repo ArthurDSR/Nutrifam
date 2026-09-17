@@ -71,21 +71,13 @@ export const FoodBudLandscape: React.FC<FoodBudLandscapeProps> = ({ season, time
           </g>
         ) : (
           <>
-            {/* Friendly sun from the supplied reference: round face with a tiny blue flower. */}
+            {/* Friendly sun: round face with warm glow without flower. */}
             <g transform="translate(337 150)">
               <circle r="37" fill="url(#foodbudSunGlow)" />
               <circle r="18" fill="#F8DD66" />
               <ellipse cx="-5.5" cy="-1" rx="1.4" ry="2" fill="#7B6B43" />
               <ellipse cx="5.5" cy="-1" rx="1.4" ry="2" fill="#7B6B43" />
               <path d="M-3 6q3 2 6 0" fill="none" stroke="#B49143" strokeWidth="1.3" strokeLinecap="round" />
-              <g transform="translate(-12 -13)">
-                <circle cx="-3" cy="0" r="3" fill="#76BFD2" />
-                <circle cx="3" cy="0" r="3" fill="#76BFD2" />
-                <circle cy="-3" r="3" fill="#8DCBDA" />
-                <circle cy="3" r="3" fill="#8DCBDA" />
-                <circle r="2" fill="#E8B64E" />
-                <path d="M3 4q5 3 4 8" fill="none" stroke="#79A06A" strokeWidth="1.5" />
-              </g>
             </g>
 
             <g fill={palette.cloud} opacity="0.97">

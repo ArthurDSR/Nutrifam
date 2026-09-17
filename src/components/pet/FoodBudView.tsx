@@ -9,12 +9,12 @@ import {
   Sun,
   Sparkles,
   Smile,
-  ArrowRight,
   Pencil
 } from 'lucide-react';
 import { useTheme } from '../../services/themeService';
 import { FoodBudLandscape } from './FoodBudLandscape';
 import { FoodBudMascot } from './FoodBudMascot';
+import { SeasonalParticles } from './SeasonalParticles';
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 export type TimeOfDay = 'day' | 'sunset' | 'night';
@@ -120,6 +120,7 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
   const [wardrobePreviewGlasses, setWardrobePreviewGlasses] = useState<string | null>(propEquippedGlasses);
   const [wardrobePreviewClothes, setWardrobePreviewClothes] = useState<string | null>(propEquippedClothes || null);
   const [wardrobeCategory, setWardrobeCategory] = useState<'all' | 'cap' | 'glasses' | 'clothes'>('all');
+  const [shopCategory, setShopCategory] = useState<'all' | 'cap' | 'glasses' | 'clothes'>('all');
 
   useEffect(() => {
     setInventory(propInventory);
@@ -192,6 +193,36 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
   // Shop Catalog (Focused on accessories & cosmetics)
   const shopCatalog: ShopItem[] = [
     {
+      id: 'cap_lilac',
+      name: 'Boné Lilás Clássico',
+      cost: 100,
+      type: 'cap',
+      color: '#AC82C7',
+      darkColor: '#8958A6',
+      icon: '🧢',
+      description: 'Boné lilás virado para trás, assinatura do FoodBud'
+    },
+    {
+      id: 'cap_beanie',
+      name: 'Gorro de Inverno com Pompom',
+      cost: 140,
+      type: 'cap',
+      color: '#2563eb',
+      darkColor: '#1d4ed8',
+      icon: '❄️',
+      description: 'Gorro quentinho de lã com pompom felpudo'
+    },
+    {
+      id: 'cap_headband',
+      name: 'Faixa Esportiva NutriFit',
+      cost: 90,
+      type: 'cap',
+      color: '#10b981',
+      darkColor: '#059669',
+      icon: '🏃',
+      description: 'Faixa atlética elástica para corridas e treinos'
+    },
+    {
       id: 'cap_blue',
       name: 'Boné Azul Esportivo',
       cost: 100,
@@ -199,7 +230,7 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
       color: '#0284c7',
       darkColor: '#0369a1',
       icon: '🧢',
-      description: 'Boné aba curva estilizado para o Guaxinim atleta'
+      description: 'Boné aba curva esportivo para o Guaxinim atleta'
     },
     {
       id: 'cap_gold',
@@ -222,22 +253,12 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
       description: 'Boné esportivo camuflagem para trilhas'
     },
     {
-      id: 'cap_lilac',
-      name: 'Boné Lilás Clássico',
-      cost: 100,
-      type: 'cap',
-      color: '#A875B7',
-      darkColor: '#9B66AA',
-      icon: '🧢',
-      description: 'Boné lilás tradicional com aba frontal e costura'
-    },
-    {
       id: 'glasses_sun',
       name: 'Óculos de Sol Retrô',
       cost: 150,
       type: 'glasses',
       icon: '🕶️',
-      description: 'Proteção estilosa com lentes pretas'
+      description: 'Proteção estilosa com lentes escuras'
     },
     {
       id: 'glasses_round',
@@ -245,15 +266,33 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
       cost: 120,
       type: 'glasses',
       icon: '👓',
-      description: 'Armação fina com lentes de leitura'
+      description: 'Armação fina dourada com lentes de leitura'
+    },
+    {
+      id: 'glasses_modern',
+      name: 'Óculos Escuros Urbanos',
+      cost: 130,
+      type: 'glasses',
+      icon: '🕶️',
+      description: 'Armação quadrada moderna com lentes escuras'
+    },
+    {
+      id: 'clothes_scarf_red',
+      name: 'Cachecol Vermelho de Inverno',
+      cost: 120,
+      type: 'clothes',
+      color: '#dc2626',
+      darkColor: '#991b1b',
+      icon: '🧣',
+      description: 'Cachecol quentinho idêntico ao do boneco de neve'
     },
     {
       id: 'clothes_hoodie_emerald',
       name: 'Moletom Esmeralda Fit',
       cost: 160,
       type: 'clothes',
-      color: '#059669',
-      darkColor: '#047857',
+      color: '#487A63',
+      darkColor: '#3B6451',
       icon: '🧥',
       description: 'Moletom quentinho com zíper e capuz esportivo'
     },
@@ -483,282 +522,246 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
 
   // Render visual SVG thumbnail for shop items
   const renderItemThumbnail = (it: ShopItem) => {
+    // 1. CAPS & HEADWEAR
+    if (it.id === 'cap_lilac') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          {/* Backwards Lilac Cap Dome */}
+          <path d="M 11 25 C 11 14 17 9 20 9 C 23 9 29 14 29 25 Z" fill="#AC82C7" />
+          {/* Center seam */}
+          <path d="M 20 9 L 20 22" stroke="#8958A6" strokeWidth="1" opacity="0.6" />
+          {/* Top button */}
+          <ellipse cx="20" cy="9" rx="2" ry="1.2" fill="#8958A6" />
+          {/* Backwards curved visor / brim */}
+          <path d="M 8 25 C 13 29 27 29 32 25 C 29 21 24 20 20 20 C 16 20 11 21 8 25 Z" fill="#8958A6" />
+        </svg>
+      );
+    }
+    if (it.id === 'cap_blue') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 11 23 C 12 13 18 9 22 9 C 26 9 32 13 32 23 Z" fill="#0284C7" />
+          <line x1="22" y1="9" x2="22" y2="22" stroke="#0369A1" strokeWidth="1" opacity="0.5" />
+          <circle cx="22" cy="9" r="1.5" fill="#0369A1" />
+          <path d="M 7 24 C 11 20 17 22 25 22 C 29 22 33 23 33 24 C 26 28 13 28 7 24 Z" fill="#0369A1" />
+        </svg>
+      );
+    }
+    if (it.id === 'cap_green') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 11 23 C 12 13 18 9 22 9 C 26 9 32 13 32 23 Z" fill="#16A34A" />
+          <line x1="22" y1="9" x2="22" y2="22" stroke="#15803D" strokeWidth="1" opacity="0.5" />
+          <circle cx="22" cy="9" r="1.5" fill="#15803D" />
+          <path d="M 7 24 C 11 20 17 22 25 22 C 29 22 33 23 33 24 C 26 28 13 28 7 24 Z" fill="#15803D" />
+        </svg>
+      );
+    }
+    if (it.id === 'cap_beanie') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          {/* Beanie Dome */}
+          <path d="M 11 26 C 11 15 16 11 20 11 C 24 11 29 15 29 26 Z" fill="#2563EB" />
+          {/* Knit ribs */}
+          <line x1="16" y1="13" x2="16" y2="25" stroke="#1D4ED8" strokeWidth="1" opacity="0.6" />
+          <line x1="20" y1="11" x2="20" y2="25" stroke="#1D4ED8" strokeWidth="1" opacity="0.6" />
+          <line x1="24" y1="13" x2="24" y2="25" stroke="#1D4ED8" strokeWidth="1" opacity="0.6" />
+          {/* Fold cuff */}
+          <rect x="9" y="24" width="22" height="6" rx="2.5" fill="#1D4ED8" />
+          {/* White Pom-pom */}
+          <circle cx="20" cy="9" r="4.5" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="0.8" />
+        </svg>
+      );
+    }
+    if (it.id === 'cap_headband') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 6 22 Q 20 27 34 22 L 33 16 Q 20 21 7 16 Z" fill="#10B981" stroke="#059669" strokeWidth="1" />
+          <line x1="7" y1="19" x2="33" y2="19" stroke="#ECFDF5" strokeWidth="1.8" />
+        </svg>
+      );
+    }
     if (it.id === 'cap_gold') {
       return (
-        <svg viewBox="20 10 90 40" className="w-8 h-8 shrink-0">
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
           <path
-            d="M 35 40 C 33 30, 28 22, 32 20 C 35 18, 39 24, 45 27 C 52 18, 57 14, 65 14 C 73 14, 78 18, 85 27 C 91 24, 95 18, 98 20 C 102 22, 97 30, 95 40 Z"
-            fill="#f59e0b"
-            stroke="#b45309"
-            strokeWidth="1.5"
+            d="M 8 28 L 6 15 L 13 21 L 20 10 L 27 21 L 34 15 L 32 28 Z"
+            fill="#F59E0B"
+            stroke="#B45309"
+            strokeWidth="1.2"
           />
-          <circle cx="65" cy="14" r="3" fill="#3b82f6" />
-          <circle cx="32" cy="20" r="2.5" fill="#ef4444" />
-          <circle cx="98" cy="20" r="2.5" fill="#ef4444" />
-          <circle cx="45" cy="27" r="2" fill="#10b981" />
-          <circle cx="85" cy="27" r="2" fill="#10b981" />
+          <rect x="7" y="25" width="26" height="4" rx="2" fill="#D97706" stroke="#92400E" strokeWidth="0.8" />
+          <circle cx="20" cy="10" r="2" fill="#3B82F6" stroke="#1D4ED8" strokeWidth="0.6" />
+          <circle cx="6" cy="15" r="1.6" fill="#EF4444" stroke="#B91C1C" strokeWidth="0.6" />
+          <circle cx="34" cy="15" r="1.6" fill="#EF4444" stroke="#B91C1C" strokeWidth="0.6" />
+          <circle cx="13" cy="21" r="1.4" fill="#10B981" stroke="#047857" strokeWidth="0.6" />
+          <circle cx="27" cy="21" r="1.4" fill="#10B981" stroke="#047857" strokeWidth="0.6" />
         </svg>
       );
     }
     if (it.type === 'cap') {
       return (
-        <svg viewBox="25 15 80 40" className="w-8 h-8 shrink-0">
-          <path d="M 35 38 C 35 20, 85 20, 85 38 Z" fill={it.color || '#9333ea'} stroke="#1e293b" strokeWidth="1.5" />
-          <circle cx="60" cy="21" r="2.5" fill="#1e293b" />
-          <path d="M 28 38 C 38 46, 82 46, 92 38 C 84 33, 36 33, 28 38 Z" fill={it.darkColor || it.color || '#7e22ce'} stroke="#1e293b" strokeWidth="1.5" />
-          <circle cx="60" cy="30" r="3" fill="#ffffff" />
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 11 23 C 12 13 18 9 22 9 C 26 9 32 13 32 23 Z" fill={it.color || '#AC82C7'} />
+          <circle cx="22" cy="9" r="1.5" fill={it.darkColor || '#8958A6'} />
+          <path d="M 7 24 C 11 20 17 22 25 22 C 29 22 33 23 33 24 C 26 28 13 28 7 24 Z" fill={it.darkColor || '#8958A6'} />
         </svg>
       );
     }
+
+    // 2. GLASSES & EYEWEAR
     if (it.id === 'glasses_sun') {
       return (
-        <svg viewBox="30 40 70 30" className="w-8 h-8 shrink-0">
-          <path d="M 35 48 L 55 48 C 55 58, 52 62, 45 62 C 38 62, 35 58, 35 48 Z" fill="#020617" stroke="#1e293b" strokeWidth="1.5" />
-          <line x1="55" y1="52" x2="68" y2="52" stroke="#020617" strokeWidth="2" />
-          <path d="M 68 48 L 88 48 C 88 58, 85 62, 78 62 C 71 62, 68 58, 68 48 Z" fill="#020617" stroke="#1e293b" strokeWidth="1.5" />
-          <line x1="39" y1="51" x2="48" y2="59" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
-          <line x1="72" y1="51" x2="81" y2="59" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 6 15 H 18 V 22 C 18 26 6 26 6 22 Z" fill="#0F172A" stroke="#020617" strokeWidth="1.5" />
+          <path d="M 22 15 H 34 V 22 C 34 26 22 26 22 22 Z" fill="#0F172A" stroke="#020617" strokeWidth="1.5" />
+          <line x1="18" y1="18" x2="22" y2="18" stroke="#020617" strokeWidth="2" />
+          <line x1="8" y1="17" x2="14" y2="23" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
+          <line x1="24" y1="17" x2="30" y2="23" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
+        </svg>
+      );
+    }
+    if (it.id === 'glasses_round') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <circle cx="13" cy="20" r="7" fill="rgba(255,255,255,0.2)" stroke="#D97706" strokeWidth="1.8" />
+          <circle cx="27" cy="20" r="7" fill="rgba(255,255,255,0.2)" stroke="#D97706" strokeWidth="1.8" />
+          <line x1="19" y1="20" x2="21" y2="20" stroke="#D97706" strokeWidth="1.8" />
+          <path d="M 10 17 L 14 21" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
+          <path d="M 24 17 L 28 21" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
+        </svg>
+      );
+    }
+    if (it.id === 'glasses_modern') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <rect x="6" y="14" width="12" height="11" rx="2.5" fill="#1E293B" stroke="#0F172A" strokeWidth="1.5" />
+          <rect x="22" y="14" width="12" height="11" rx="2.5" fill="#1E293B" stroke="#0F172A" strokeWidth="1.5" />
+          <line x1="18" y1="18" x2="22" y2="18" stroke="#0F172A" strokeWidth="2" />
+          <line x1="8" y1="17" x2="16" y2="17" stroke="#38BDF8" strokeWidth="1.2" opacity="0.8" strokeLinecap="round" />
+          <line x1="24" y1="17" x2="32" y2="17" stroke="#38BDF8" strokeWidth="1.2" opacity="0.8" strokeLinecap="round" />
         </svg>
       );
     }
     if (it.type === 'glasses') {
       return (
-        <svg viewBox="30 40 70 30" className="w-8 h-8 shrink-0">
-          <circle cx="46" cy="54" r="8" fill="rgba(255,255,255,0.4)" stroke="#0f172a" strokeWidth="1.8" />
-          <line x1="54" y1="54" x2="69" y2="54" stroke="#0f172a" strokeWidth="1.8" />
-          <circle cx="77" cy="54" r="8" fill="rgba(255,255,255,0.4)" stroke="#0f172a" strokeWidth="1.8" />
-          <path d="M 42 50 L 48 56" stroke="#ffffff" strokeWidth="1" strokeLinecap="round" opacity="0.8" />
-          <path d="M 73 50 L 79 56" stroke="#ffffff" strokeWidth="1" strokeLinecap="round" opacity="0.8" />
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <circle cx="13" cy="20" r="7" fill="rgba(255,255,255,0.3)" stroke="#0F172A" strokeWidth="1.8" />
+          <circle cx="27" cy="20" r="7" fill="rgba(255,255,255,0.3)" stroke="#0F172A" strokeWidth="1.8" />
+          <line x1="20" y1="20" x2="20" y2="20" stroke="#0F172A" strokeWidth="2" />
+          <path d="M 10 18 L 14 22" stroke="#FFFFFF" strokeWidth="1" strokeLinecap="round" opacity="0.8" />
         </svg>
       );
     }
-    // Clothes thumbnails
+
+    // 3. CLOTHES & WEARABLES
+    if (it.id === 'clothes_scarf_red') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 8 16 C 12 21 28 21 32 16 C 34 20 30 24 20 24 C 10 24 6 20 8 16 Z" fill="#DC2626" stroke="#991B1B" strokeWidth="1.2" />
+          <ellipse cx="16" cy="20" rx="3" ry="2.5" fill="#B91C1C" />
+          <path d="M 14 21 L 12 33 C 12 35 18 35 18 33 L 19 22 Z" fill="#B91C1C" />
+          <path d="M 18 22 L 17 30 C 17 31 22 31 22 30 L 23 22 Z" fill="#DC2626" />
+          <line x1="13" y1="33" x2="13" y2="35.5" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round" />
+          <line x1="15" y1="33" x2="15" y2="35.5" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round" />
+          <line x1="17" y1="33" x2="17" y2="35.5" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      );
+    }
     if (it.id === 'clothes_hoodie_emerald') {
       return (
-        <svg viewBox="30 20 70 50" className="w-8 h-8 shrink-0">
-          <path d="M 38 32 C 38 24, 92 24, 92 32 L 88 62 C 72 65, 58 65, 42 62 Z" fill="#059669" stroke="#047857" strokeWidth="1.5" />
-          <line x1="65" y1="30" x2="65" y2="60" stroke="#f1f5f9" strokeWidth="1.5" />
-          <path d="M 52 48 L 78 48 L 74 58 L 56 58 Z" fill="#047857" />
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 11 14 C 14 11 26 11 29 14 L 33 22 L 29 23 L 28 32 C 24 33 16 33 12 32 L 11 23 L 7 22 Z" fill="#487A63" stroke="#3B6451" strokeWidth="1.2" />
+          <path d="M 14 13 C 17 16 23 16 26 13 Z" fill="#3B6451" />
+          <line x1="20" y1="14" x2="20" y2="24" stroke="#F1F5F9" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M 15 24 H 25 L 24 29 H 16 Z" fill="#3B6451" stroke="#2D4E3F" strokeWidth="0.8" />
         </svg>
       );
     }
     if (it.id === 'clothes_shirt_striped') {
       return (
-        <svg viewBox="30 20 70 50" className="w-8 h-8 shrink-0">
-          <path d="M 38 32 C 38 24, 92 24, 92 32 L 88 62 C 72 65, 58 65, 42 62 Z" fill="#ffffff" stroke="#2563eb" strokeWidth="1.5" />
-          <line x1="40" y1="38" x2="90" y2="38" stroke="#3b82f6" strokeWidth="2.5" />
-          <line x1="41" y1="46" x2="89" y2="46" stroke="#3b82f6" strokeWidth="2.5" />
-          <line x1="43" y1="54" x2="87" y2="54" stroke="#3b82f6" strokeWidth="2.5" />
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 12 13 C 15 11 25 11 28 13 L 32 21 L 28 22 L 28 32 C 24 33 16 33 12 32 L 12 22 L 8 21 Z" fill="#F8FAFC" stroke="#2563EB" strokeWidth="1.2" />
+          <path d="M 16 12 C 18 15 22 15 24 12" stroke="#2563EB" strokeWidth="1.5" fill="none" />
+          <line x1="10" y1="18" x2="30" y2="18" stroke="#2563EB" strokeWidth="1.8" />
+          <line x1="12" y1="22" x2="28" y2="22" stroke="#2563EB" strokeWidth="1.8" />
+          <line x1="12" y1="26" x2="28" y2="26" stroke="#2563EB" strokeWidth="1.8" />
+          <line x1="13" y1="30" x2="27" y2="30" stroke="#2563EB" strokeWidth="1.8" />
         </svg>
       );
     }
     if (it.id === 'clothes_vest_puffer') {
       return (
-        <svg viewBox="30 20 70 50" className="w-8 h-8 shrink-0">
-          <path d="M 40 32 C 40 25, 90 25, 90 32 L 87 62 C 72 65, 58 65, 43 62 Z" fill="#ea580c" stroke="#c2410c" strokeWidth="1.5" />
-          <line x1="42" y1="41" x2="88" y2="41" stroke="#c2410c" strokeWidth="2" />
-          <line x1="43" y1="50" x2="87" y2="50" stroke="#c2410c" strokeWidth="2" />
-          <line x1="65" y1="30" x2="65" y2="62" stroke="#0f172a" strokeWidth="1.5" />
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 13 13 C 16 11 24 11 27 13 L 29 18 L 28 32 C 24 33 16 33 12 32 L 11 18 Z" fill="#EA580C" stroke="#C2410C" strokeWidth="1.2" />
+          <path d="M 14 13 C 17 15 23 15 26 13" stroke="#9A3412" strokeWidth="2" fill="none" />
+          <path d="M 12 18 Q 20 20 28 18" stroke="#C2410C" strokeWidth="1.5" fill="none" />
+          <path d="M 12 23 Q 20 25 28 23" stroke="#C2410C" strokeWidth="1.5" fill="none" />
+          <path d="M 12 28 Q 20 30 28 28" stroke="#C2410C" strokeWidth="1.5" fill="none" />
+          <line x1="20" y1="13" x2="20" y2="32" stroke="#1C1917" strokeWidth="1.5" />
         </svg>
       );
     }
+    if (it.id === 'clothes_bandana_gold') {
+      return (
+        <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+          <path d="M 8 16 Q 20 21 32 16 L 30 19 Q 20 23 10 19 Z" fill="#CA8A04" />
+          <path d="M 10 18 Q 20 22 30 18 L 20 33 Z" fill="#EAB308" stroke="#CA8A04" strokeWidth="1.2" />
+          <path d="M 13 20 Q 20 25 27 20" stroke="#FDE047" strokeWidth="1.4" fill="none" />
+          <circle cx="20" cy="24" r="2" fill="#EF4444" stroke="#991B1B" strokeWidth="0.6" />
+        </svg>
+      );
+    }
+
     return (
-      <svg viewBox="30 20 70 50" className="w-8 h-8 shrink-0">
-        <path d="M 42 30 C 52 36, 78 36, 88 30 L 65 58 Z" fill="#eab308" stroke="#ca8a04" strokeWidth="1.5" />
-        <circle cx="65" cy="34" r="3" fill="#ef4444" />
+      <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0">
+        <path d="M 10 18 Q 20 22 30 18 L 20 33 Z" fill="#EAB308" stroke="#CA8A04" strokeWidth="1.2" />
+        <circle cx="20" cy="24" r="2" fill="#EF4444" />
       </svg>
     );
   };
 
-  // Render fitting room preview raccoon avatar
+  // Render fitting room preview raccoon avatar using the official mascot component
   const renderFittingRoomRaccoon = (
     previewCap: string | null,
     previewGlasses: string | null,
     previewClothes?: string | null
   ) => {
     const itemCap = shopCatalog.find((i) => i.id === previewCap);
-    const pCapColor = itemCap?.color || '#9333ea';
-    const pCapDarker = itemCap?.darkColor || '#7e22ce';
+    const pCapColor = itemCap?.color || '#AC82C7';
+    const pCapDarker = itemCap?.darkColor || '#8958A6';
 
     return (
-      <svg viewBox="15 10 100 115" className="w-20 h-24 filter drop-shadow-sm select-none">
-        {/* Ears */}
-        <path d="M 28 50 C 22 30, 30 15, 42 15 C 53 15, 58 29, 58 38 Z" fill="#9E6E49" stroke="#744B2D" strokeWidth="1.5" />
-        <path d="M 33 46 C 30 29, 36 21, 42 21 C 48 21, 52 30, 51 38 Z" fill="#5C3B24" />
-        <path d="M 36 43 C 34 32, 38 26, 42 26 C 46 26, 48 33, 47 38 Z" fill="#EED9BD" />
-        <path d="M 102 50 C 108 30, 100 15, 88 15 C 77 15, 72 29, 72 38 Z" fill="#9E6E49" stroke="#744B2D" strokeWidth="1.5" />
-        <path d="M 97 46 C 100 29, 94 21, 88 21 C 82 21, 78 30, 79 38 Z" fill="#5C3B24" />
-        <path d="M 94 43 C 96 32, 92 26, 88 26 C 84 26, 82 33, 83 38 Z" fill="#EED9BD" />
-
-        {/* Body Base */}
-        <ellipse cx="65" cy="85" rx="32" ry="25" fill="#9E6E49" stroke="#744B2D" strokeWidth="1.5" />
-        <ellipse cx="65" cy="88" rx="20" ry="17" fill="#EED9BD" />
-
-        {/* Clothes in Fitting Room */}
-        {previewClothes === 'clothes_hoodie_emerald' && (
-          <g className="filter drop-shadow-xs">
-            <path
-              d="M 38 72 C 34 80, 36 94, 38 104 C 50 107, 80 107, 92 104 C 94 94, 96 80, 92 72 C 84 70, 46 70, 38 72 Z"
-              fill="#059669"
-              stroke="#047857"
-              strokeWidth="1.5"
-            />
-            <line x1="65" y1="72" x2="65" y2="105" stroke="#f1f5f9" strokeWidth="1.5" />
-            <path d="M 52 90 L 78 90 L 75 101 L 55 101 Z" fill="#047857" stroke="#065f46" strokeWidth="1" />
-            <path d="M 59 73 Q 58 83 60 85" stroke="#ffffff" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-            <path d="M 71 73 Q 72 83 70 85" stroke="#ffffff" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-          </g>
-        )}
-
-        {previewClothes === 'clothes_shirt_striped' && (
-          <g className="filter drop-shadow-xs">
-            <path
-              d="M 38 72 C 34 80, 36 94, 38 104 C 50 107, 80 107, 92 104 C 94 94, 96 80, 92 72 C 84 70, 46 70, 38 72 Z"
-              fill="#ffffff"
-              stroke="#1e3a8a"
-              strokeWidth="1.5"
-            />
-            <path d="M 38 78 Q 65 84 92 78" stroke="#2563eb" strokeWidth="2.5" fill="none" />
-            <path d="M 37 86 Q 65 92 93 86" stroke="#2563eb" strokeWidth="2.5" fill="none" />
-            <path d="M 38 94 Q 65 100 92 94" stroke="#2563eb" strokeWidth="2.5" fill="none" />
-            <path d="M 40 102 Q 65 106 90 102" stroke="#2563eb" strokeWidth="2" fill="none" />
-          </g>
-        )}
-
-        {previewClothes === 'clothes_vest_puffer' && (
-          <g className="filter drop-shadow-xs">
-            <path
-              d="M 40 72 C 38 80, 39 94, 40 104 C 52 107, 78 107, 90 104 C 91 94, 92 80, 90 72 C 82 70, 48 70, 40 72 Z"
-              fill="#ea580c"
-              stroke="#c2410c"
-              strokeWidth="1.5"
-            />
-            <path d="M 40 79 Q 65 85 90 79" stroke="#9a3412" strokeWidth="1.8" fill="none" />
-            <path d="M 39 88 Q 65 94 91 88" stroke="#9a3412" strokeWidth="1.8" fill="none" />
-            <path d="M 40 97 Q 65 102 90 97" stroke="#9a3412" strokeWidth="1.8" fill="none" />
-            <line x1="65" y1="71" x2="65" y2="105" stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" />
-          </g>
-        )}
-
-        {previewClothes === 'clothes_bandana_gold' && (
-          <g className="filter drop-shadow-xs">
-            <path
-              d="M 44 70 C 55 76, 75 76, 86 70 L 65 96 Z"
-              fill="#eab308"
-              stroke="#ca8a04"
-              strokeWidth="1.5"
-            />
-            <circle cx="65" cy="74" r="3.5" fill="#ef4444" stroke="#b91c1c" strokeWidth="1" />
-            <line x1="52" y1="74" x2="60" y2="84" stroke="#ca8a04" strokeWidth="1" strokeDasharray="1 1" />
-            <line x1="78" y1="74" x2="70" y2="84" stroke="#ca8a04" strokeWidth="1" strokeDasharray="1 1" />
-          </g>
-        )}
-
-        {/* Paws */}
-        <ellipse cx="50" cy="85" rx="5" ry="4" fill="#744B2D" stroke="#5C3B24" strokeWidth="1" />
-        <ellipse cx="80" cy="85" rx="5" ry="4" fill="#744B2D" stroke="#5C3B24" strokeWidth="1" />
-
-        {/* Head */}
-        <ellipse cx="65" cy="54" rx="38" ry="30" fill="#9E6E49" stroke="#744B2D" strokeWidth="1.8" />
-        <path d="M 26 55 C 22 59, 23 66, 31 68 C 35 69, 36 68, 38 69 C 34 64, 30 58, 26 55 Z" fill="#EED9BD" />
-        <path d="M 104 55 C 108 59, 107 66, 99 68 C 95 69, 94 68, 92 69 C 96 64, 100 58, 104 55 Z" fill="#EED9BD" />
-
-        {/* Mask */}
-        <path d="M 32 50 C 42 46, 54 48, 65 53 C 76 48, 88 46, 98 50 C 102 58, 94 66, 84 66 C 74 66, 70 60, 65 60 C 60 60, 56 66, 46 66 C 36 66, 28 58, 32 50 Z" fill="#5C3B24" />
-        <path d="M 42 45 Q 48 41 54 46" stroke="#ffffff" strokeWidth="2" fill="none" strokeLinecap="round" />
-        <path d="M 76 46 Q 82 41 88 45" stroke="#ffffff" strokeWidth="2" fill="none" strokeLinecap="round" />
-
-        {/* Snout & Nose */}
-        <ellipse cx="65" cy="64" rx="14" ry="10" fill="#EED9BD" />
-        <ellipse cx="65" cy="62.5" rx="4.5" ry="3.2" fill="#24160E" />
-        <ellipse cx="63.8" cy="61.5" rx="1.5" ry="0.9" fill="#ffffff" opacity="0.8" />
-        <path d="M 60 67 Q 62.5 70 65 67 Q 67.5 70 70 67" stroke="#24160E" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-
-        {/* Whiskers */}
-        <line x1="45" y1="62" x2="30" y2="60" stroke="#EED9BD" strokeWidth="1" strokeLinecap="round" />
-        <line x1="45" y1="65" x2="32" y2="67" stroke="#EED9BD" strokeWidth="1" strokeLinecap="round" />
-        <line x1="85" y1="62" x2="100" y2="60" stroke="#EED9BD" strokeWidth="1" strokeLinecap="round" />
-        <line x1="85" y1="65" x2="98" y2="67" stroke="#EED9BD" strokeWidth="1" strokeLinecap="round" />
-
-        {/* Eyes */}
-        <ellipse cx="47" cy="54" rx="4.5" ry="5" fill="#1A110B" />
-        <circle cx="45.5" cy="52.5" r="1.5" fill="#ffffff" />
-        <ellipse cx="83" cy="54" rx="4.5" ry="5" fill="#1A110B" />
-        <circle cx="81.5" cy="52.5" r="1.5" fill="#ffffff" />
-
-        {/* Cap Preview */}
-        {previewCap && previewCap !== 'cap_gold' && (
-          <g className="filter drop-shadow-sm">
-            <path d="M 40 40 C 40 18, 90 18, 90 40 Z" fill={pCapColor} stroke="#1e293b" strokeWidth="1.8" />
-            <path d="M 53 19 Q 54 39 55 40" stroke={pCapDarker} strokeWidth="1" fill="none" opacity="0.6" />
-            <path d="M 65 18 L 65 40" stroke={pCapDarker} strokeWidth="1" fill="none" opacity="0.6" />
-            <path d="M 77 19 Q 76 39 75 40" stroke={pCapDarker} strokeWidth="1" fill="none" opacity="0.6" />
-            <circle cx="65" cy="21" r="3" fill="#1e293b" />
-            <path d="M 33 40 C 44 49, 86 49, 97 40 C 89 34, 41 34, 33 40 Z" fill={pCapDarker} stroke="#1e293b" strokeWidth="1.5" />
-            <circle cx="65" cy="31" r="4" fill="#ffffff" />
-            <circle cx="65" cy="31" r="2" fill="#1e293b" />
-          </g>
-        )}
-
-        {/* Crown Preview */}
-        {previewCap === 'cap_gold' && (
-          <g className="filter drop-shadow-md">
-            <path
-              d="M 40 42 C 38 33, 34 24, 37 22 C 40 20, 44 26, 49 29 C 55 20, 60 16, 65 16 C 70 16, 75 20, 81 29 C 86 26, 90 20, 93 22 C 96 24, 92 33, 90 42 Z"
-              fill="#f59e0b"
-              stroke="#b45309"
-              strokeWidth="1.8"
-            />
-            <rect x="39" y="38" width="52" height="6" rx="3" fill="#d97706" stroke="#92400e" strokeWidth="1" />
-            <circle cx="65" cy="16" r="3.5" fill="#3b82f6" stroke="#1d4ed8" strokeWidth="1" />
-            <circle cx="37" cy="22" r="2.8" fill="#ef4444" stroke="#b91c1c" strokeWidth="1" />
-            <circle cx="93" cy="22" r="2.8" fill="#ef4444" stroke="#b91c1c" strokeWidth="1" />
-            <circle cx="49" cy="29" r="2.4" fill="#10b981" stroke="#047857" strokeWidth="1" />
-            <circle cx="81" cy="29" r="2.4" fill="#10b981" stroke="#047857" strokeWidth="1" />
-          </g>
-        )}
-
-        {/* Glasses Preview */}
-        {previewGlasses && (
-          <g className="filter drop-shadow-xs">
-            {previewGlasses === 'glasses_round' ? (
-              <>
-                <circle cx="47" cy="54" r="9" fill="rgba(255,255,255,0.3)" stroke="#0f172a" strokeWidth="2" />
-                <line x1="56" y1="54" x2="74" y2="54" stroke="#0f172a" strokeWidth="2" />
-                <circle cx="83" cy="54" r="9" fill="rgba(255,255,255,0.3)" stroke="#0f172a" strokeWidth="2" />
-                <path d="M 43 50 L 51 58" stroke="#ffffff" strokeWidth="1.2" opacity="0.7" strokeLinecap="round" />
-                <path d="M 79 50 L 87 58" stroke="#ffffff" strokeWidth="1.2" opacity="0.7" strokeLinecap="round" />
-              </>
-            ) : (
-              <>
-                <path d="M 37 47 L 57 47 C 57 58, 54 63, 47 63 C 40 63, 37 58, 37 47 Z" fill="#020617" stroke="#1e293b" strokeWidth="2" />
-                <line x1="57" y1="51" x2="73" y2="51" stroke="#020617" strokeWidth="2.5" />
-                <path d="M 73 47 L 93 47 C 93 58, 90 63, 83 63 C 76 63, 73 58, 73 47 Z" fill="#020617" stroke="#1e293b" strokeWidth="2" />
-                <line x1="41" y1="50" x2="52" y2="60" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" opacity="0.35" />
-                <line x1="77" y1="50" x2="88" y2="60" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" opacity="0.35" />
-              </>
-            )}
-          </g>
-        )}
-      </svg>
+      <div className="w-full h-full flex items-center justify-center p-0.5 overflow-hidden">
+        <FoodBudMascot
+          mood="happy"
+          petLevel={petLevel}
+          equippedCap={previewCap}
+          equippedGlasses={previewGlasses}
+          equippedClothes={previewClothes || null}
+          capColor={pCapColor}
+          capDarker={pCapDarker}
+          className="w-20 h-24 scale-95"
+        />
+      </div>
     );
   };
 
   return (
-    <div className="flex-1 flex flex-col relative select-none overflow-hidden pb-3 bg-[#B7C7BA]">
+    <div className="flex-1 flex flex-col relative select-none overflow-hidden pb-1 bg-[#B7C7BA]">
       <FoodBudLandscape season={currentSeason} timeOfDay={currentTimeOfDay} />
+      <SeasonalParticles season={currentSeason} />
 
-      {/* Top Status Header - Redesigned Clean HUD */}
-      <div className="px-4 pt-3.5 z-10 space-y-2">
-        {/* Tier 1: Identity & Currency Bar */}
+      {/* Top Status Header - Unified Minimalist Glass HUD */}
+      <div className="px-3.5 pt-3 z-10">
         <div
-          className={`backdrop-blur-md rounded-2xl px-3.5 py-2 flex items-center justify-between shadow-2xs border transition-colors duration-300 ${
+          className={`backdrop-blur-md rounded-2xl px-3 py-2 flex items-center justify-between shadow-2xs border transition-colors duration-300 ${
             isDark
               ? 'bg-[#232D29]/90 text-[#EDF2EF] border-[#394842]'
               : 'bg-white/95 text-[#3F4B46] border-[#AEBDB5]/30'
           }`}
         >
-          {/* Left: Pet Avatar, Name & Edit Button */}
+          {/* Left: Pet Avatar, Name & Level/XP progress */}
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               onClick={() => {
@@ -772,7 +775,9 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
               }}
               title="Clique para renomear seu Guaxinim"
             >
-              <span className="text-xl leading-none">🦝</span>
+              <div className="w-6 h-6 flex items-center justify-center">
+                <FoodBudMascot headOnly className="w-full h-full" mood="happy" petLevel={petLevel} />
+              </div>
             </div>
 
             <div className="flex flex-col min-w-0">
@@ -784,20 +789,49 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
                 className="flex items-center gap-1.5 cursor-pointer group"
                 title="Clique para alterar o nome"
               >
-                <span className={`font-black text-xs sm:text-sm tracking-tight truncate max-w-[120px] sm:max-w-[150px] ${isDark ? 'text-[#EDF2EF]' : 'text-[#3F4B46]'}`}>
+                <span className={`font-black text-xs sm:text-sm tracking-tight truncate max-w-[110px] sm:max-w-[140px] ${isDark ? 'text-[#EDF2EF]' : 'text-[#3F4B46]'}`}>
                   {petName || 'FoodBud'}
                 </span>
                 <Pencil className="w-2.5 h-2.5 text-[#6F7C76] dark:text-[#A8B8B1] group-hover:opacity-80 transition-opacity shrink-0" />
               </div>
 
-              <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md mt-0.5 w-fit border ${levelInfo.badge}`}>
-                {levelInfo.shortTitle}
-              </span>
+              {/* Mini level badge and subtle XP bar */}
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border leading-tight ${levelInfo.badge}`}>
+                  {levelInfo.shortTitle}
+                </span>
+                <div
+                  className={`w-14 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-[#18201D]' : 'bg-[#ECEFE7]'}`}
+                  title={`Progresso: ${petXp}/100 XP`}
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, petXp))}%`,
+                      backgroundColor: activeColor.primary
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Right: Gems balance & Season button */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Right: Quests link + Gems balance + Weather/Season button */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onNavigateToQuests && (
+              <button
+                onClick={onNavigateToQuests}
+                className={`p-1.5 rounded-xl border transition-all active:scale-95 shadow-2xs ${
+                  isDark
+                    ? 'bg-[#18201D] text-amber-300 border-[#394842] hover:bg-[#20332D]'
+                    : 'bg-[#F7F4EE] text-amber-700 border-[#AEBDB5]/30 hover:bg-[#ECEFE7]'
+                }`}
+                title="Ver Missões Diárias"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+              </button>
+            )}
+
             {/* Gems balance */}
             <div
               className="flex items-center gap-1 px-2.5 py-1 rounded-xl font-black text-xs border shadow-2xs"
@@ -814,7 +848,7 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
             {/* Season & Time of Day button */}
             <button
               onClick={() => setShowSeasonModal(true)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all active:scale-95 shadow-2xs ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-xl text-[11px] font-black border transition-all active:scale-95 shadow-2xs ${
                 isDark
                   ? 'bg-[#232D29] text-[#EDF2EF] border-[#394842] hover:bg-[#283D36]'
                   : 'bg-white text-[#3F4B46] border-[#AEBDB5]/30 hover:bg-[#F7F4EE]'
@@ -826,61 +860,21 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Tier 2: Level Progress & Quests Callout Bar */}
-        <div
-          className={`backdrop-blur-xs rounded-2xl px-3.5 py-2 border shadow-2xs transition-colors duration-300 ${
-            isDark
-              ? 'bg-[#232D29]/85 text-[#EDF2EF] border-[#394842]'
-              : 'bg-white/90 text-[#3F4B46] border-[#AEBDB5]/30'
-          }`}
-        >
-          <div className="flex items-center justify-between text-[10px] font-extrabold mb-1">
-            <div className="flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-              <span>Evolução:</span>
-              <span style={{ color: activeColor.primary }}>
-                {petXp}/100 XP
-              </span>
-            </div>
-
-            {onNavigateToQuests && (
-              <button
-                onClick={onNavigateToQuests}
-                className="flex items-center gap-0.5 font-black hover:underline"
-                style={{ color: activeColor.primary }}
-              >
-                <span>Ver Missões</span>
-                <ArrowRight className="w-2.5 h-2.5" />
-              </button>
-            )}
-          </div>
-
-          <div className={`w-full h-2 rounded-full overflow-hidden p-0.5 ${isDark ? 'bg-[#18201D]' : 'bg-[#ECEFE7]'}`}>
-            <div
-              className="h-full rounded-full transition-all duration-500 shadow-2xs"
-              style={{
-                width: `${Math.min(100, Math.max(0, petXp))}%`,
-                backgroundColor: activeColor.primary
-              }}
-            />
-          </div>
-        </div>
       </div>
 
-      {/* Scenic Nature Garden with FoodBud & Unified Controls */}
+      {/* Scenic Nature Garden with FoodBud & Decluttered Atmosphere */}
       <div className="flex-1 relative flex flex-col justify-between overflow-hidden">
         {/* Action toast feedback */}
         {petActionEffect && (
-          <div className="absolute top-4 inset-x-0 flex justify-center z-30">
+          <div className="absolute top-3 inset-x-0 flex justify-center z-30">
             <span className="bg-slate-900/95 text-white backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black shadow-xl animate-in zoom-in-95 duration-150 border border-slate-700">
               {petActionEffect}
             </span>
           </div>
         )}
 
-        {/* Mascot is anchored to the meadow instead of vertically centered. */}
-        <div className="absolute inset-x-0 bottom-[152px] z-10 flex justify-center pointer-events-none">
+        {/* Mascot sits naturally in the spacious meadow without crowding */}
+        <div className="absolute inset-x-0 bottom-[110px] z-10 flex justify-center pointer-events-none">
           {/* Guaxinim Container (Clickable affection interaction) */}
           <div
             onClick={handlePetCarinho}
@@ -930,104 +924,97 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
             />
           </div>
         </div>
-        {/* Bottom Controls Area (Floating harmoniously on the lush meadow) */}
-        <div className="relative z-20 flex flex-col gap-2.5 px-5 pb-3 mt-auto">
-          {/* Direct Interactive Action Bar with elevated shadow dock */}
-          <div className="flex items-center justify-center">
-            <div
-              className={`${
+
+        {/* Bottom Controls Area: Streamlined & Balanced */}
+        <div className="relative z-20 flex flex-col items-center gap-2 px-4 pb-2 mt-auto">
+          {/* Care Action Bar */}
+          <div
+            className={`${
+              isDark
+                ? 'bg-[#232D29]/90 text-[#EDF2EF] border-[#394842]'
+                : 'bg-white/95 text-[#3F4B46] border-[#AEBDB5]/30'
+            } shadow-cozy backdrop-blur-md px-3 py-1.5 rounded-full border flex items-center gap-1.5 transition-colors duration-300`}
+          >
+            <button
+              onClick={handlePetCarinho}
+              className={`px-3 py-1.5 rounded-full ${
                 isDark
-                  ? 'bg-[#232D29]/90 text-[#EDF2EF] border-[#394842]'
-                  : 'bg-white/95 text-[#3F4B46] border-[#AEBDB5]/30'
-              } shadow-cozy backdrop-blur-md px-3.5 py-2 rounded-full border flex items-center gap-2 transition-colors duration-300`}
+                  ? 'bg-[#18201D] hover:bg-rose-950/40 text-[#EDF2EF] border-[#394842]'
+                  : 'bg-[#F7F4EE] hover:bg-rose-50 text-[#3F4B46] border-[#AEBDB5]/30'
+              } text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 border`}
+              title="Fazer Carinho no Guaxinim"
             >
-              <button
-                onClick={handlePetCarinho}
-                className={`px-3.5 py-2 rounded-full ${
-                  isDark
-                    ? 'bg-[#18201D] hover:bg-rose-950/40 text-[#EDF2EF] border-[#394842]'
-                    : 'bg-[#F7F4EE] hover:bg-rose-50 text-[#3F4B46] border-[#AEBDB5]/30'
-                } text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 border`}
-                title="Fazer Carinho no Guaxinim"
-              >
-                <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
-                <span>Carinho</span>
-              </button>
+              <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+              <span>Carinho</span>
+            </button>
 
-              <button
-                onClick={handlePlayPet}
-                className={`px-3.5 py-2 rounded-full ${
-                  isDark
-                    ? 'bg-[#18201D] hover:bg-sky-950/40 text-[#EDF2EF] border-[#394842]'
-                    : 'bg-[#F7F4EE] hover:bg-sky-50 text-[#3F4B46] border-[#AEBDB5]/30'
-                } text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 border`}
-                title="Brincar com o Guaxinim"
-              >
-                <Smile className="w-4 h-4 text-sky-500" />
-                <span>Brincar</span>
-              </button>
+            <button
+              onClick={handlePlayPet}
+              className={`px-3 py-1.5 rounded-full ${
+                isDark
+                  ? 'bg-[#18201D] hover:bg-sky-950/40 text-[#EDF2EF] border-[#394842]'
+                  : 'bg-[#F7F4EE] hover:bg-sky-50 text-[#3F4B46] border-[#AEBDB5]/30'
+              } text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 border`}
+              title="Brincar com o Guaxinim"
+            >
+              <Smile className="w-3.5 h-3.5 text-sky-500" />
+              <span>Brincar</span>
+            </button>
 
-              <button
-                onClick={handleFeedHealthy}
-                className={`px-3.5 py-2 rounded-full ${
-                  isDark
-                    ? 'bg-[#18201D] hover:bg-emerald-950/40 text-[#EDF2EF] border-[#394842]'
-                    : 'bg-[#F7F4EE] hover:bg-emerald-50 text-[#3F4B46] border-[#AEBDB5]/30'
-                } text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 border`}
-                title="Alimentar com fruta"
-              >
-                <Apple className="w-4 h-4 text-emerald-500" />
-                <span>Alimentar</span>
-              </button>
+            <button
+              onClick={handleFeedHealthy}
+              className={`px-3 py-1.5 rounded-full ${
+                isDark
+                  ? 'bg-[#18201D] hover:bg-emerald-950/40 text-[#EDF2EF] border-[#394842]'
+                  : 'bg-[#F7F4EE] hover:bg-emerald-50 text-[#3F4B46] border-[#AEBDB5]/30'
+              } text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 border`}
+              title="Alimentar com fruta"
+            >
+              <Apple className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Alimentar</span>
+            </button>
 
-              <button
-                onClick={handleToggleSleep}
-                className={`p-2 rounded-full ${
-                  isDark
-                    ? 'bg-[#18201D] hover:bg-[#2B3732] text-amber-300 border-[#394842]'
-                    : 'bg-[#F7F4EE] hover:bg-[#ECEFE7] text-[#3F4B46] border-[#AEBDB5]/30'
-                } shadow-2xs flex items-center justify-center transition-all active:scale-95 border`}
-                title={mood === 'sleeping' ? 'Acordar' : 'Dormir'}
-              >
-                {mood === 'sleeping' ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-indigo-400" />
-                )}
-              </button>
-            </div>
+            <button
+              onClick={handleToggleSleep}
+              className={`p-1.5 rounded-full ${
+                isDark
+                  ? 'bg-[#18201D] hover:bg-[#2B3732] text-amber-300 border-[#394842]'
+                  : 'bg-[#F7F4EE] hover:bg-[#ECEFE7] text-[#3F4B46] border-[#AEBDB5]/30'
+              } shadow-2xs flex items-center justify-center transition-all active:scale-95 border`}
+              title={mood === 'sleeping' ? 'Acordar' : 'Dormir'}
+            >
+              {mood === 'sleeping' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-indigo-400" />
+              )}
+            </button>
           </div>
 
-          {/* Bottom Action Cards: Shop & My Items */}
-          <div className="flex gap-3 select-none">
-            {/* Shop Card */}
+          {/* Compact Loja & Guarda-Roupa Actions */}
+          <div className="flex items-center gap-2 w-full max-w-xs">
             <button
               onClick={() => setShowShop(true)}
               className={`flex-1 ${
                 isDark
-                  ? 'bg-[#232D29]/90 hover:bg-[#232D29] border-[#394842] text-[#EDF2EF]'
-                  : 'bg-white/95 hover:bg-white border-[#AEBDB5]/30 text-[#3F4B46]'
-              } border rounded-3xl p-3 flex flex-col items-center justify-center transition-all active:scale-95 relative shadow-cozy backdrop-blur-md`}
+                  ? 'bg-[#232D29]/90 hover:bg-[#283D36] border-[#394842] text-[#EDF2EF]'
+                  : 'bg-white/95 hover:bg-[#F7F4EE] border-[#AEBDB5]/30 text-[#3F4B46]'
+              } border rounded-2xl py-2 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-cozy backdrop-blur-md`}
             >
-              <div className="text-2xl mb-1">🏬</div>
-              <span className="font-black text-xs">
-                Loja de Acessórios
-              </span>
+              <span className="text-base leading-none">🏬</span>
+              <span className="font-black text-xs">Loja</span>
             </button>
 
-            {/* My Items Card */}
             <button
               onClick={() => setShowItems(true)}
               className={`flex-1 ${
                 isDark
-                  ? 'bg-[#232D29]/90 hover:bg-[#232D29] border-[#394842] text-[#EDF2EF]'
-                  : 'bg-white/95 hover:bg-white border-[#AEBDB5]/30 text-[#3F4B46]'
-              } border rounded-3xl p-3 flex flex-col items-center justify-center transition-all active:scale-95 shadow-cozy backdrop-blur-md`}
+                  ? 'bg-[#232D29]/90 hover:bg-[#283D36] border-[#394842] text-[#EDF2EF]'
+                  : 'bg-white/95 hover:bg-[#F7F4EE] border-[#AEBDB5]/30 text-[#3F4B46]'
+              } border rounded-2xl py-2 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-cozy backdrop-blur-md`}
             >
-              <div className="text-2xl mb-1">🧺</div>
-              <span className="font-black text-xs">
-                Personalizar Guaxinim
-              </span>
+              <span className="text-base leading-none">🧺</span>
+              <span className="font-black text-xs">Guarda-Roupa</span>
             </button>
           </div>
         </div>
@@ -1119,8 +1106,32 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
               </div>
             </div>
 
+            {/* Category Filter Tabs */}
+            <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 dark:bg-[#18201D] rounded-xl mb-2 shrink-0 border border-transparent dark:border-[#394842]">
+              {[
+                { id: 'all', label: 'Todos' },
+                { id: 'cap', label: 'Bonés' },
+                { id: 'glasses', label: 'Óculos' },
+                { id: 'clothes', label: 'Roupas' },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setShopCategory(cat.id as any)}
+                  className={`py-1 rounded-lg text-[10px] font-black transition-all ${
+                    shopCategory === cat.id
+                      ? 'bg-white dark:bg-[#232D29] text-slate-800 dark:text-[#EDF2EF] shadow-xs'
+                      : 'text-slate-500 dark:text-[#A8B8B1] hover:text-slate-700 dark:hover:text-[#EDF2EF]'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-2 mt-2 max-h-60 overflow-y-auto pr-0.5">
-              {shopCatalog.map((it) => {
+              {shopCatalog
+                .filter((it) => shopCategory === 'all' || it.type === shopCategory)
+                .map((it) => {
                 const isOwned = inventory.includes(it.id);
                 const isPreviewing = previewItem?.id === it.id;
 
@@ -1430,8 +1441,8 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
       {showNamingModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-[#232D29] w-full max-w-sm rounded-3xl p-6 shadow-cozy border border-[#AEBDB5]/30 dark:border-[#394842] animate-in zoom-in-95 duration-200 text-center relative overflow-hidden transition-colors">
-            <div className="w-20 h-20 bg-[#ECEFE7] dark:bg-[#243730] rounded-full mx-auto flex items-center justify-center border-2 border-[#AEBDB5]/40 dark:border-[#394842] shadow-2xs mb-3">
-              <span className="text-4xl">🦝</span>
+            <div className="w-20 h-20 bg-[#ECEFE7] dark:bg-[#243730] rounded-full mx-auto flex items-center justify-center border-2 border-[#AEBDB5]/40 dark:border-[#394842] shadow-2xs mb-3 p-2">
+              <FoodBudMascot headOnly className="w-full h-full" mood="happy" petLevel={petLevel} />
             </div>
 
             <h3 className="text-base font-extrabold text-[#3F4B46] dark:text-[#EDF2EF]">

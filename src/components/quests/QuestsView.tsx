@@ -3,6 +3,7 @@ import { Gem, CheckCircle2, Award, Sparkles, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DayLog } from '../../types';
 import { useTheme } from '../../services/themeService';
+import { FoodBudMascot } from '../pet/FoodBudMascot';
 
 interface QuestsViewProps {
   dayLog: DayLog;
@@ -150,8 +151,10 @@ export const QuestsView: React.FC<QuestsViewProps> = ({
         {/* Guaxinim Pet XP Card */}
         <div className="bg-white dark:bg-[#232D29] rounded-3xl p-4 border border-[#AEBDB5]/30 dark:border-[#394842] shadow-cozy flex flex-col justify-between transition-colors">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🦝</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/20 p-0.5 flex items-center justify-center shrink-0">
+                <FoodBudMascot headOnly className="w-full h-full" mood="happy" petLevel={petLevel} />
+              </div>
               <div>
                 <div className="text-xs font-black text-[#3F4B46] dark:text-[#EDF2EF]">
                   {petName || 'Guaxinim FoodBud'}

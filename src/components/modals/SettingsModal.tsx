@@ -4,6 +4,7 @@ import { UserProfile } from '../../types';
 import { useTranslation, Language } from '../../services/i18n';
 import { testAIConnection } from '../../services/aiService';
 import { useTheme, PASTEL_COLORS, SecondaryColor, ThemeMode } from '../../services/themeService';
+import { FoodBudMascot } from '../pet/FoodBudMascot';
 
 interface SettingsModalProps {
   profile: UserProfile;
@@ -418,7 +419,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="p-3.5 bg-[#F7F4EE] dark:bg-[#18201D] rounded-2xl border border-[#AEBDB5]/30 dark:border-[#394842] flex items-center justify-between">
               <div className="pr-3">
                 <div className="flex items-center gap-1.5 font-bold text-[#3F4B46] dark:text-[#EDF2EF] text-xs mb-0.5">
-                  <span>🦝</span>
+                  <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                    <FoodBudMascot headOnly className="w-full h-full" mood="happy" petLevel={1} />
+                  </div>
                   <span>Pesquisa Inicial com Guaxinim</span>
                 </div>
                 <p className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1] leading-snug">

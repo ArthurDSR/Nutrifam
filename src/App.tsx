@@ -1026,6 +1026,9 @@ export const App: React.FC = () => {
           onClose={() => setIsEditProfileOpen(false)}
           onSaveProfile={(updated) => {
             setProfile(updated);
+            if (isSupabaseConfigured()) {
+              saveProfileToSupabase(updated);
+            }
             if (updated.dailyCaloriesTarget) {
               updateCurrentDayLog(syncDayLogMealTargets(currentDayLog, updated.dailyCaloriesTarget));
             }

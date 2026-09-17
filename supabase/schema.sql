@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   name TEXT NOT NULL,
   email TEXT UNIQUE,
   avatar_text TEXT DEFAULT 'A',
+  avatar_url TEXT DEFAULT NULL,
   goal_type TEXT DEFAULT 'Lose weight',
   height_cm NUMERIC DEFAULT 0,
   start_weight_kg NUMERIC DEFAULT 0,
@@ -44,6 +45,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS pet_name TEXT DEFAULT '';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS equipped_clothes TEXT DEFAULT NULL;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS show_splash_animation BOOLEAN DEFAULT true;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT NULL;
 
 -- 3. Tabela de Registros Diários (Refeições, Água, Jejum, Atividades, Notas)
 CREATE TABLE IF NOT EXISTS public.day_logs (
@@ -205,3 +207,70 @@ CREATE POLICY "Usuários podem gerenciar seus alimentos personalizados"
   TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+
+-- ==============================================================================
+-- 5. Supabase Storage - Bucket de Fotos de Perfil ('avatars')
+-- ==============================================================================
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'avatars',
+  'avatars',
+  true,
+  5242880, -- 5MB
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+-- Políticas de RLS para o Bucket 'avatars'
+DROP POLICY IF EXISTS "Avatares são publicamente visíveis" ON storage.objects;
+CREATE POLICY "Avatares são publicamente visíveis"
+  ON storage.objects FOR SELECT
+  TO public
+  USING (bucket_id = 'avatars');
+
+DROP POLICY IF EXISTS "Usuários autenticados podem enviar avatar" ON storage.objects;
+CREATE POLICY "Usuários autenticados podem enviar avatar"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'avatars' AND
+    (
+      auth.uid()::text = (storage.foldername(name))[1]
+      OR auth.uid()::text = split_part(name, '/', 1)
+      OR name LIKE auth.uid()::text || '/%'
+      OR name LIKE auth.uid()::text || '_%'
+    )
+  );
+
+DROP POLICY IF EXISTS "Usuários autenticados podem atualizar seu avatar" ON storage.objects;
+CREATE POLICY "Usuários autenticados podem atualizar seu avatar"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (
+    bucket_id = 'avatars' AND
+    (
+      auth.uid()::text = (storage.foldername(name))[1]
+      OR auth.uid()::text = split_part(name, '/', 1)
+      OR name LIKE auth.uid()::text || '/%'
+      OR name LIKE auth.uid()::text || '_%'
+    )
+  );
+
+DROP POLICY IF EXISTS "Usuários autenticados podem deletar seu avatar" ON storage.objects;
+CREATE POLICY "Usuários autenticados podem deletar seu avatar"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'avatars' AND
+    (
+      auth.uid()::text = (storage.foldername(name))[1]
+      OR auth.uid()::text = split_part(name, '/', 1)
+      OR name LIKE auth.uid()::text || '/%'
+      OR name LIKE auth.uid()::text || '_%'
+    )
+  );
+

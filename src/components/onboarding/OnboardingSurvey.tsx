@@ -28,6 +28,7 @@ import {
   AuthUser
 } from '../../services/authService';
 import { useTheme } from '../../services/themeService';
+import { FoodBudMascot, FoodBudMood } from '../pet/FoodBudMascot';
 
 interface OnboardingSurveyProps {
   onComplete: (completedProfile: UserProfile, initialWeight: number, authUser?: AuthUser) => void;
@@ -527,154 +528,29 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
     onComplete(completedProfile, validCurrentWeight, registeredUser || undefined);
   };
 
-  // Render Vector Raccoon with specific poses and expressions
+  // Render Vector Raccoon with specific poses and accessories matching FoodBud
   const renderRaccoon = () => {
     const { pose } = raccoonState;
+    const mood: FoodBudMood =
+      pose === 'celebrate' || pose === 'welcome' ? 'love' : 'happy';
+    const equippedCap =
+      pose === 'celebrate'
+        ? 'cap_gold'
+        : pose === 'sporty'
+        ? 'cap_headband'
+        : 'cap_lilac';
+    const equippedGlasses = pose === 'intellectual' ? 'glasses_round' : null;
+
     return (
-      <div className="relative w-28 h-28 flex items-center justify-center select-none transition-transform duration-300">
-        <svg viewBox="0 0 130 130" className="w-full h-full overflow-visible drop-shadow-md">
-          <defs>
-            <linearGradient id="onboardEarGradL" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#6B4934" />
-              <stop offset="100%" stopColor="#334155" />
-            </linearGradient>
-            <linearGradient id="onboardEarGradR" x1="100%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#6B4934" />
-              <stop offset="100%" stopColor="#334155" />
-            </linearGradient>
-            <linearGradient id="onboardFurGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#8F684D" />
-              <stop offset="100%" stopColor="#6B4934" />
-            </linearGradient>
-          </defs>
-
-          {/* Ears */}
-          <path
-            d="M 26 62 C 20 40, 28 16, 40 16 C 52 16, 58 32, 60 42 Z"
-            fill="url(#onboardEarGradL)"
-            stroke="#1e293b"
-            strokeWidth="2.2"
-          />
-          <path d="M 32 56 C 28 36, 34 23, 40 23 C 46 23, 52 34, 52 42 Z" fill="#fda4af" />
-
-          <path
-            d="M 104 62 C 110 40, 102 16, 90 16 C 78 16, 72 32, 70 42 Z"
-            fill="url(#onboardEarGradR)"
-            stroke="#1e293b"
-            strokeWidth="2.2"
-          />
-          <path d="M 98 56 C 102 36, 96 23, 90 23 C 84 23, 78 34, 78 42 Z" fill="#fda4af" />
-
-          {/* Head Base */}
-          <ellipse cx="65" cy="62" rx="42" ry="34" fill="url(#onboardFurGrad)" stroke="#1e293b" strokeWidth="2.2" />
-
-          {/* Cheek Fluff */}
-          <path d="M 22 64 C 18 72, 26 80, 36 82 C 30 74, 26 68, 22 64 Z" fill="#E9D9BD" />
-          <path d="M 108 64 C 112 72, 104 80, 94 82 C 100 74, 104 68, 108 64 Z" fill="#E9D9BD" />
-
-          {/* Bandit Mask */}
-          <path
-            d="M 28 58 C 40 53, 53 55, 65 60 C 77 55, 90 53, 102 58 C 106 68, 98 77, 86 77 C 75 77, 71 70, 65 70 C 59 70, 55 77, 44 77 C 32 77, 24 68, 28 58 Z"
-            fill="#513B35"
-          />
-
-          {/* Eyebrow Tufts */}
-          <path d="M 39 52 Q 46 47 53 53" stroke="#D8BB8C" strokeWidth="3.5" fill="none" strokeLinecap="round" />
-          <path d="M 77 53 Q 84 47 91 52" stroke="#D8BB8C" strokeWidth="3.5" fill="none" strokeLinecap="round" />
-
-          {/* Snout */}
-          <ellipse cx="65" cy="74" rx="16" ry="11" fill="#ffffff" />
-          <ellipse cx="65" cy="71" rx="5" ry="3.5" fill="#0f172a" />
-          <ellipse cx="63.8" cy="70" rx="1.6" ry="1" fill="#ffffff" opacity="0.8" />
-
-          {/* Mouth */}
-          {pose === 'celebrate' ? (
-            <ellipse cx="65" cy="79" rx="4" ry="4.5" fill="#ef4444" stroke="#0f172a" strokeWidth="1" />
-          ) : pose === 'thinking' ? (
-            <path d="M 60 78 Q 65 76 70 78" stroke="#0f172a" strokeWidth="2" fill="none" strokeLinecap="round" />
-          ) : (
-            <path d="M 59 77 Q 62 81 65 77 Q 68 81 71 77" stroke="#0f172a" strokeWidth="2" fill="none" strokeLinecap="round" />
-          )}
-
-          {/* Rosy Cheeks */}
-          <ellipse cx="38" cy="72" rx="4" ry="2.5" fill="#fda4af" opacity="0.85" />
-          <ellipse cx="92" cy="72" rx="4" ry="2.5" fill="#fda4af" opacity="0.85" />
-
-          {/* Whiskers */}
-          <line x1="44" y1="72" x2="30" y2="70" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" />
-          <line x1="44" y1="76" x2="32" y2="78" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" />
-          <line x1="86" y1="72" x2="100" y2="70" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" />
-          <line x1="86" y1="76" x2="98" y2="78" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" />
-
-          {/* Eyes according to pose */}
-          {pose === 'celebrate' ? (
-            <>
-              {/* Joy curved happy eyes */}
-              <path d="M 43 62 Q 49 55 55 62" stroke="#ffffff" strokeWidth="3" fill="none" strokeLinecap="round" />
-              <path d="M 75 62 Q 81 55 87 62" stroke="#ffffff" strokeWidth="3" fill="none" strokeLinecap="round" />
-            </>
-          ) : pose === 'thinking' ? (
-            <>
-              {/* One curious eye, one squinted */}
-              <ellipse cx="49" cy="62" rx="5" ry="6" fill="#ffffff" />
-              <circle cx="49" cy="62" r="4" fill="#0f172a" />
-              <circle cx="47.5" cy="60" r="1.5" fill="#ffffff" />
-              <path d="M 75 62 Q 81 58 87 62" stroke="#ffffff" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-            </>
-          ) : (
-            <>
-              {/* Normal bright glossy anime eyes */}
-              <ellipse cx="49" cy="62" rx="5.5" ry="6.5" fill="#ffffff" />
-              <circle cx="49" cy="62" r="4.5" fill="#0f172a" />
-              <circle cx="47.5" cy="60" r="1.8" fill="#ffffff" />
-              <ellipse cx="81" cy="62" rx="5.5" ry="6.5" fill="#ffffff" />
-              <circle cx="81" cy="62" r="4.5" fill="#0f172a" />
-              <circle cx="79.5" cy="60" r="1.8" fill="#ffffff" />
-            </>
-          )}
-
-          {/* Special accessories per pose */}
-          {pose === 'intellectual' && (
-            /* Round scholar glasses */
-            <g>
-              <circle cx="49" cy="62" r="10" fill="rgba(255,255,255,0.25)" stroke="#38bdf8" strokeWidth="2" />
-              <line x1="59" y1="62" x2="71" y2="62" stroke="#38bdf8" strokeWidth="2" />
-              <circle cx="81" cy="62" r="10" fill="rgba(255,255,255,0.25)" stroke="#38bdf8" strokeWidth="2" />
-            </g>
-          )}
-
-          {pose === 'sporty' && (
-            /* Red athletic headband */
-            <g>
-              <path d="M 32 45 C 50 38, 80 38, 98 45 L 96 51 C 80 44, 50 44, 34 51 Z" fill="#ef4444" stroke="#b91c1c" strokeWidth="1" />
-              <circle cx="65" cy="46" r="3" fill="#ffffff" />
-            </g>
-          )}
-
-          {pose === 'celebrate' && (
-            /* Golden celebration crown */
-            <g>
-              <path
-                d="M 46 36 C 44 28, 40 20, 43 18 C 46 16, 50 21, 54 24 C 60 16, 65 12, 69 12 C 73 12, 78 16, 84 24 C 88 21, 92 16, 95 18 C 98 20, 94 28, 92 36 Z"
-                fill="#f59e0b"
-                stroke="#b45309"
-                strokeWidth="1.5"
-              />
-              <circle cx="69" cy="12" r="2.8" fill="#ef4444" />
-              <circle cx="43" cy="18" r="2.2" fill="#3b82f6" />
-              <circle cx="95" cy="18" r="2.2" fill="#10b981" />
-            </g>
-          )}
-
-          {pose === 'welcome' && (
-            /* Lilac cap */
-            <g>
-              <path d="M 44 38 C 44 20, 86 20, 86 38 Z" fill="#A875B7" stroke="#5B4261" strokeWidth="1.5" />
-              <path d="M 38 38 C 48 45, 82 45, 92 38 C 85 33, 45 33, 38 38 Z" fill="#8E609D" stroke="#5B4261" strokeWidth="1.2" />
-              <circle cx="65" cy="30" r="3" fill="#ffffff" />
-            </g>
-          )}
-        </svg>
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center select-none transition-transform duration-300">
+        <FoodBudMascot
+          mood={mood}
+          petLevel={1}
+          equippedCap={equippedCap}
+          equippedGlasses={equippedGlasses}
+          equippedClothes={null}
+          className="w-24 h-24 sm:w-26 sm:h-26 object-contain drop-shadow-md"
+        />
       </div>
     );
   };
@@ -807,7 +683,9 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
                   <span className="text-[10px] text-slate-400">{petName.length}/14 letras</span>
                 </div>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm">🦝</span>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
+                    <FoodBudMascot headOnly className="w-full h-full" mood="happy" petLevel={1} />
+                  </div>
                   <input
                     type="text"
                     value={petName}
