@@ -20,7 +20,7 @@ export const ActivitiesCard: React.FC<ActivitiesCardProps> = ({
   isSyncingHealth = false
 }) => {
   const { t } = useTranslation();
-  const { activeColor } = useTheme();
+  const { activeColor, isDark } = useTheme();
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [selectedType, setSelectedType] = useState('Caminhada');
   const [durationMin, setDurationMin] = useState(30);
@@ -51,14 +51,20 @@ export const ActivitiesCard: React.FC<ActivitiesCardProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border border-amber-200/60 dark:border-amber-700/40 flex items-center justify-center text-xl shadow-2xs">
+          <div
+            className="w-10 h-10 rounded-2xl border flex items-center justify-center text-xl shadow-2xs"
+            style={{
+              backgroundColor: isDark ? activeColor.darkBg : activeColor.pastel,
+              borderColor: isDark ? activeColor.darkBorder : activeColor.border
+            }}
+          >
             🏆
           </div>
           <h3 className="font-extrabold text-[#3F4B46] dark:text-[#EDF2EF] text-base">
             {t('activity.title')}
           </h3>
         </div>
-        <span className="text-xs font-bold text-orange-500 dark:text-orange-400">
+        <span className="text-xs font-bold" style={{ color: isDark ? activeColor.darkText : activeColor.textDark }}>
           {totalCaloriesBurned} {t('activity.burned')}
         </span>
       </div>
@@ -77,7 +83,7 @@ export const ActivitiesCard: React.FC<ActivitiesCardProps> = ({
                 <span className="text-[#6F7C76] dark:text-[#A8B8B1] ml-2">({item.durationMinutes} min)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-orange-500 dark:text-orange-400 font-extrabold">-{item.caloriesBurned} Cal</span>
+                <span className="font-extrabold" style={{ color: isDark ? activeColor.darkText : activeColor.textDark }}>-{item.caloriesBurned} Cal</span>
                 <button
                   onClick={() => onRemoveActivity(item.id)}
                   className="text-[#AEBDB5] dark:text-[#A8B8B1] hover:text-rose-500 dark:hover:text-rose-400 p-1 transition-colors"

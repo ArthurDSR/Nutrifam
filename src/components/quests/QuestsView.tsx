@@ -116,7 +116,9 @@ export const QuestsView: React.FC<QuestsViewProps> = ({
         <div
           className="rounded-3xl p-4 shadow-cozy border transition-colors flex items-center justify-between"
           style={{
-            backgroundColor: isDark ? activeColor.darkBg : activeColor.bgTintLight,
+            background: isDark
+              ? `linear-gradient(135deg, ${activeColor.darkBg} 0%, #232D29 100%)`
+              : `linear-gradient(135deg, ${activeColor.pastel} 0%, ${activeColor.bgTintLight} 100%)`,
             borderColor: isDark ? activeColor.darkBorder : activeColor.border
           }}
         >
@@ -131,7 +133,7 @@ export const QuestsView: React.FC<QuestsViewProps> = ({
               <Gem className="w-5 h-5" style={{ color: activeColor.primary }} />
               <span
                 className="text-2xl font-black"
-                style={{ color: isDark ? '#EDF2EF' : '#3F4B46' }}
+                style={{ color: isDark ? activeColor.darkText : activeColor.textDark }}
               >
                 {currentGems}
               </span>

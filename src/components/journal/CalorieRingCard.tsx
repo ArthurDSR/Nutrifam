@@ -21,6 +21,13 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
   const { isDark, activeColor } = useTheme();
   const [showMacroDetails, setShowMacroDetails] = useState(false);
 
+  const secondarySurface = {
+    backgroundColor: isDark ? activeColor.darkBg : activeColor.pastel,
+    borderColor: isDark ? activeColor.darkBorder : activeColor.border,
+    color: isDark ? activeColor.darkText : activeColor.textDark
+  };
+  const secondaryAccent = isDark ? activeColor.darkText : activeColor.primary;
+
   // Calculate totals
   const eatenCalories = Math.round(
     Object.values(dayLog.meals).reduce(
@@ -106,7 +113,7 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
     ? 'text-rose-500 dark:text-rose-400'
     : isOver
     ? 'text-amber-600 dark:text-amber-400'
-    : 'text-[#3F4B46] dark:text-[#EDF2EF]';
+    : '';
 
   return (
     <div
@@ -124,16 +131,17 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
         <div className="flex flex-col items-center w-24">
           <button
             onClick={onOpenGemsInfo}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all active:scale-95 border bg-[#F0FDF4] dark:bg-[#183328] border-[#A7F3D0] dark:border-[#2A5442] text-[#065F46] dark:text-[#A7F3D0]"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all active:scale-95 border"
+            style={secondarySurface}
             title="Gemas do NutriFam"
           >
-            <Gem className="w-3.5 h-3.5 text-[#10B981]" />
+            <Gem className="w-3.5 h-3.5" style={{ color: secondaryAccent }} />
             <span>{profile.gems}</span>
           </button>
 
           <div className="mt-2.5 text-center">
             <div className="flex items-center justify-center gap-1">
-              <Utensils className="w-3.5 h-3.5 text-[#3F4B46] dark:text-[#EDF2EF]" />
+              <Utensils className="w-3.5 h-3.5" style={{ color: secondaryAccent }} />
               <span className="text-xl font-black text-[#3F4B46] dark:text-[#EDF2EF] tracking-tight leading-none">
                 {eatenCalories}
               </span>
@@ -194,7 +202,10 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
 
           {/* Central Calorie Readout Pill directly inside the circle contour */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none p-1">
-            <span className={`text-2xl font-black tracking-tight leading-none ${centerNumberColor}`}>
+            <span
+              className={`text-2xl font-black tracking-tight leading-none ${centerNumberColor}`}
+              style={!isOver ? { color: secondaryAccent } : undefined}
+            >
               {isOver ? `+${remainingOrOverCalories}` : remainingOrOverCalories}
             </span>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6F7C76] dark:text-[#A8B8B1] mt-0.5">
@@ -208,9 +219,9 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
                   : isOver
                   ? { backgroundColor: isDark ? '#3D2A14' : '#FEF3C7', color: isDark ? '#FDE68A' : '#92400E', borderColor: isDark ? '#78350F' : '#FDE68A' }
                   : {
-                      backgroundColor: isDark ? '#183328' : '#DCFCE7',
-                      borderColor: isDark ? '#2A5442' : '#86EFAC',
-                      color: isDark ? '#A7F3D0' : '#15803D'
+                      backgroundColor: isDark ? activeColor.darkBg : activeColor.pastel,
+                      borderColor: isDark ? activeColor.darkBorder : activeColor.border,
+                      color: isDark ? activeColor.darkText : activeColor.textDark
                     }
               }
             >
@@ -223,16 +234,17 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
         <div className="flex flex-col items-center w-24">
           <button
             onClick={onOpenBurnedInfo}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all active:scale-95 border bg-[#FFF7ED] dark:bg-[#2E1E17] border-[#FED7AA] dark:border-[#543425] text-[#9A3412] dark:text-[#FED7AA]"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all active:scale-95 border"
+            style={secondarySurface}
             title="Calorias Queimadas"
           >
-            <Flame className="w-3.5 h-3.5 text-[#FB923C] fill-[#FB923C]" />
+            <Flame className="w-3.5 h-3.5" style={{ color: secondaryAccent, fill: secondaryAccent }} />
             <span>{burnedCalories}</span>
           </button>
 
           <div className="mt-2.5 text-center">
             <div className="flex items-center justify-center gap-1">
-              <Flame className="w-3.5 h-3.5 text-[#FB923C]" />
+              <Flame className="w-3.5 h-3.5" style={{ color: secondaryAccent }} />
               <span className="text-xl font-black text-[#3F4B46] dark:text-[#EDF2EF] tracking-tight leading-none">
                 {burnedCalories}
               </span>
@@ -248,16 +260,17 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
       <div className="mt-4 pt-1.5 border-t border-[#AEBDB5]/20 dark:border-[#394842]">
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2 text-center">
           {/* Protein */}
-          <div className="bg-white dark:bg-[#1D2E27] rounded-2xl p-2.5 shadow-2xs border border-[#AEBDB5]/25 dark:border-[#2A443A] transition-colors">
+          <div className="rounded-2xl p-2.5 shadow-2xs border transition-colors" style={secondarySurface}>
             <div className="flex items-center justify-between gap-1 text-[9.5px] sm:text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] mb-1">
               <span className="truncate">{t('journal.protein')}</span>
-              <span className="shrink-0 ml-auto text-[#6366F1] dark:text-[#A5B4FC] font-extrabold">{eatenProtein}g</span>
+              <span className="shrink-0 ml-auto font-extrabold" style={{ color: secondaryAccent }}>{eatenProtein}g</span>
             </div>
-            <div className="h-1.5 bg-[#ECEFE7] dark:bg-[#14231E] rounded-full overflow-hidden">
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${activeColor.primary}24` }}>
               <div
-                className="h-full bg-[#818CF8] dark:bg-[#A5B4FC] rounded-full transition-all duration-500"
+                className="h-full rounded-full transition-all duration-500"
                 style={{
-                  width: `${Math.min(100, (eatenProtein / (profile.targetMacros.proteinGrams || 1)) * 100)}%`
+                  width: `${Math.min(100, (eatenProtein / (profile.targetMacros.proteinGrams || 1)) * 100)}%`,
+                  backgroundColor: secondaryAccent
                 }}
               />
             </div>
@@ -269,16 +282,17 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
           </div>
 
           {/* Carbs */}
-          <div className="bg-white dark:bg-[#1D2E27] rounded-2xl p-2.5 shadow-2xs border border-[#AEBDB5]/25 dark:border-[#2A443A] transition-colors">
+          <div className="rounded-2xl p-2.5 shadow-2xs border transition-colors" style={secondarySurface}>
             <div className="flex items-center justify-between gap-1 text-[9.5px] sm:text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] mb-1">
               <span className="truncate">{t('journal.carbs')}</span>
-              <span className="shrink-0 ml-auto text-[#D97706] dark:text-[#FDE68A] font-extrabold">{eatenCarbs}g</span>
+              <span className="shrink-0 ml-auto font-extrabold" style={{ color: secondaryAccent }}>{eatenCarbs}g</span>
             </div>
-            <div className="h-1.5 bg-[#ECEFE7] dark:bg-[#14231E] rounded-full overflow-hidden">
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${activeColor.primary}24` }}>
               <div
-                className="h-full bg-[#FBBF24] dark:bg-[#FDE68A] rounded-full transition-all duration-500"
+                className="h-full rounded-full transition-all duration-500"
                 style={{
-                  width: `${Math.min(100, (eatenCarbs / (profile.targetMacros.carbsGrams || 1)) * 100)}%`
+                  width: `${Math.min(100, (eatenCarbs / (profile.targetMacros.carbsGrams || 1)) * 100)}%`,
+                  backgroundColor: secondaryAccent
                 }}
               />
             </div>
@@ -290,16 +304,17 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
           </div>
 
           {/* Fat */}
-          <div className="bg-white dark:bg-[#1D2E27] rounded-2xl p-2.5 shadow-2xs border border-[#AEBDB5]/25 dark:border-[#2A443A] transition-colors">
+          <div className="rounded-2xl p-2.5 shadow-2xs border transition-colors" style={secondarySurface}>
             <div className="flex items-center justify-between gap-1 text-[9.5px] sm:text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] mb-1">
               <span className="truncate">{t('journal.fat')}</span>
-              <span className="shrink-0 ml-auto text-[#E11D48] dark:text-[#FDA4AF] font-extrabold">{eatenFat}g</span>
+              <span className="shrink-0 ml-auto font-extrabold" style={{ color: secondaryAccent }}>{eatenFat}g</span>
             </div>
-            <div className="h-1.5 bg-[#ECEFE7] dark:bg-[#14231E] rounded-full overflow-hidden">
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${activeColor.primary}24` }}>
               <div
-                className="h-full bg-[#F87171] dark:bg-[#FDA4AF] rounded-full transition-all duration-500"
+                className="h-full rounded-full transition-all duration-500"
                 style={{
-                  width: `${Math.min(100, (eatenFat / (profile.targetMacros.fatGrams || 1)) * 100)}%`
+                  width: `${Math.min(100, (eatenFat / (profile.targetMacros.fatGrams || 1)) * 100)}%`,
+                  backgroundColor: secondaryAccent
                 }}
               />
             </div>
@@ -311,16 +326,17 @@ export const CalorieRingCard: React.FC<CalorieRingCardProps> = ({
           </div>
 
           {/* Fiber */}
-          <div className="bg-white dark:bg-[#1D2E27] rounded-2xl p-2.5 shadow-2xs border border-[#AEBDB5]/25 dark:border-[#2A443A] transition-colors">
+          <div className="rounded-2xl p-2.5 shadow-2xs border transition-colors" style={secondarySurface}>
             <div className="flex items-center justify-between gap-1 text-[9.5px] sm:text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] mb-1">
               <span className="truncate">{t('journal.fiber')}</span>
-              <span className="shrink-0 ml-auto text-[#059669] dark:text-[#A7F3D0] font-extrabold">{eatenFiber}g</span>
+              <span className="shrink-0 ml-auto font-extrabold" style={{ color: secondaryAccent }}>{eatenFiber}g</span>
             </div>
-            <div className="h-1.5 bg-[#ECEFE7] dark:bg-[#14231E] rounded-full overflow-hidden">
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${activeColor.primary}24` }}>
               <div
-                className="h-full bg-[#34D399] dark:bg-[#A7F3D0] rounded-full transition-all duration-500"
+                className="h-full rounded-full transition-all duration-500"
                 style={{
-                  width: `${Math.min(100, (eatenFiber / (profile.targetMacros.fiberGrams || 1)) * 100)}%`
+                  width: `${Math.min(100, (eatenFiber / (profile.targetMacros.fiberGrams || 1)) * 100)}%`,
+                  backgroundColor: secondaryAccent
                 }}
               />
             </div>

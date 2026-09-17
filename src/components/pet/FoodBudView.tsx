@@ -797,12 +797,15 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
           {/* Right: Gems balance & Season button */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Gems balance */}
-            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl font-black text-xs border shadow-2xs ${
-              isDark
-                ? 'bg-[#183328] text-[#A7F3D0] border-[#2A5442]'
-                : 'bg-[#F0FDF4] text-[#065F46] border-[#A7F3D0]'
-            }`}>
-              <Gem className="w-3.5 h-3.5 fill-emerald-500 text-emerald-600 shrink-0" />
+            <div
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl font-black text-xs border shadow-2xs"
+              style={{
+                backgroundColor: isDark ? activeColor.darkBg : activeColor.pastel,
+                borderColor: isDark ? activeColor.darkBorder : activeColor.border,
+                color: isDark ? activeColor.darkText : activeColor.textDark
+              }}
+            >
+              <Gem className="w-3.5 h-3.5 shrink-0" style={{ color: activeColor.primary }} />
               <span>{gems}</span>
             </div>
 
@@ -1074,8 +1077,11 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
 
             <div className="flex items-center justify-between py-2 text-xs font-bold text-slate-600 dark:text-[#A7C2B7]">
               <span>Seu saldo:</span>
-              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-black">
-                <Gem className="w-3.5 h-3.5 fill-emerald-500" />
+              <span
+                className="flex items-center gap-1 font-black"
+                style={{ color: isDark ? activeColor.darkText : activeColor.textDark }}
+              >
+                <Gem className="w-3.5 h-3.5" style={{ color: activeColor.primary }} />
                 {gems} Gemas
               </span>
             </div>
