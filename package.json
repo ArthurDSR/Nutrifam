@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test:db": "node scripts/test-db.js",
+    "food-db:import": "node scripts/food-db/import-foods.mjs",
     "cap:sync": "npm run build && cap sync",
     "cap:android": "npm run build && cap open android",
     "cap:ios": "npm run build && cap open ios"

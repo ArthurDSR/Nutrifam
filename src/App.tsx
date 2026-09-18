@@ -128,17 +128,26 @@ export const App: React.FC = () => {
     if (isSupabaseConfigured()) {
       try {
         const remoteProfile = await loadProfileFromSupabase(authUser.id);
-        if (remoteProfile && remoteProfile.isOnboardingCompleted && remoteProfile.currentWeightKg > 0) {
+        if (remoteProfile) {
+          const hasAccountData =
+            Boolean(remoteProfile.isOnboardingCompleted) ||
+            Boolean(remoteProfile.currentWeightKg && remoteProfile.currentWeightKg > 0) ||
+            Boolean(remoteProfile.name && remoteProfile.name !== 'Meu Perfil');
+
           const mergedProfile: UserProfile = {
             ...remoteProfile,
             id: authUser.id,
-            email: authUser.email,
-            name: authUser.name || remoteProfile.name,
-            avatarText: (authUser.name?.[0] || remoteProfile.name?.[0] || 'A').toUpperCase()
+            email: authUser.email || remoteProfile.email,
+            name: (remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ? remoteProfile.name : (authUser.name || remoteProfile.name),
+            avatarText: (remoteProfile.name?.[0] || authUser.name?.[0] || 'A').toUpperCase(),
+            avatarUrl: remoteProfile.avatarUrl || undefined,
+            isOnboardingCompleted: hasAccountData
           };
           setProfile(mergedProfile);
           saveStoredProfile(mergedProfile);
-          setIsOnboardingSurveyOpen(false);
+          if (hasAccountData) {
+            setIsOnboardingSurveyOpen(false);
+          }
 
           const remoteLogs = await loadDayLogsFromSupabase(authUser.id);
           if (remoteLogs && Object.keys(remoteLogs).length > 0) {
@@ -287,11 +296,23 @@ export const App: React.FC = () => {
 
       try {
         const remoteProfile = await loadProfileFromSupabase();
-        if (remoteProfile && remoteProfile.isOnboardingCompleted && remoteProfile.currentWeightKg > 0) {
-          setProfile(remoteProfile);
-          saveStoredProfile(remoteProfile);
-        } else if (profile.isOnboardingCompleted && profile.currentWeightKg > 0) {
-          await saveProfileToSupabase(profile);
+        if (remoteProfile) {
+          const hasAccountData =
+            Boolean(remoteProfile.isOnboardingCompleted) ||
+            Boolean(remoteProfile.currentWeightKg && remoteProfile.currentWeightKg > 0) ||
+            Boolean(remoteProfile.name && remoteProfile.name !== 'Meu Perfil');
+
+          if (hasAccountData) {
+            const completedRemote: UserProfile = {
+              ...remoteProfile,
+              isOnboardingCompleted: true
+            };
+            setProfile(completedRemote);
+            saveStoredProfile(completedRemote);
+            setIsOnboardingSurveyOpen(false);
+          } else if (profile.isOnboardingCompleted && profile.currentWeightKg > 0) {
+            await saveProfileToSupabase(profile);
+          }
         }
 
         const remoteLogs = await loadDayLogsFromSupabase();
@@ -862,6 +883,10 @@ export const App: React.FC = () => {
           existingProfile={profile}
           isRedoing={isOnboardingSurveyOpen && Boolean(profile.isOnboardingCompleted)}
           onClose={() => setIsOnboardingSurveyOpen(false)}
+          onOpenLogin={() => {
+            setAuthModalMode('login');
+            setIsAuthModalOpen(true);
+          }}
         />
       ) : (
         <>

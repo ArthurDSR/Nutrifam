@@ -1,6 +1,5 @@
 import { FoodItem } from '../types';
-import { TACO_FOODS } from '../data/tacoFoods';
-import { BRAZILIAN_FOODS } from '../data/brazilianFoods';
+import { getLocalCatalogFoods } from './localFoodCatalog';
 import { parseQuickAddWithAI } from './aiService';
 
 export interface EnhancedFoodItem extends FoodItem {
@@ -208,20 +207,13 @@ export function classifyFoodCategory(item: FoodItem): FoodCategoryKey {
  * Returns popular verified Brazilian foods filtered by category for empty query view
  */
 export function getPopularFoodsByCategory(category: FoodCategoryKey = 'all'): EnhancedFoodItem[] {
-  const allStaples = [
-    ...BRAZILIAN_FOODS.map((b) => ({
-      ...b,
-      isBrazilianBrand: true,
-      sourceBadge: b.brand || 'Marca Brasileira',
-      foodCategory: classifyFoodCategory(b)
-    })),
-    ...TACO_FOODS.map((t) => ({
-      ...t,
-      isTacoResult: true,
-      sourceBadge: 'TACO (UNICAMP)',
-      foodCategory: classifyFoodCategory(t)
-    }))
-  ];
+  const allStaples = getLocalCatalogFoods().map((food) => ({
+    ...food,
+    isTacoResult: food.catalogSource === 'taco',
+    isBrazilianBrand: food.catalogSource === 'brazilian' || food.catalogSource === 'manufacturer',
+    sourceBadge: food.catalogSource === 'taco' ? 'TACO (UNICAMP)' : food.brand || food.catalogSource.toUpperCase(),
+    foodCategory: classifyFoodCategory(food)
+  }));
 
   if (category === 'all') {
     return allStaples;
@@ -231,7 +223,7 @@ export function getPopularFoodsByCategory(category: FoodCategoryKey = 'all'): En
 }
 
 /**
- * Fast synchronous search across Brazilian Brands and UNICAMP TACO staples
+ * Fast synchronous search across every source in the local catalog
  * with plural/synonym stemming and category filtering.
  */
 export function searchLocalBrazilianFoods(query: string, categoryFilter: FoodCategoryKey = 'all'): EnhancedFoodItem[] {
@@ -243,8 +235,7 @@ export function searchLocalBrazilianFoods(query: string, categoryFilter: FoodCat
   const queryTokens = normQuery.split(' ').filter(Boolean);
   const results: EnhancedFoodItem[] = [];
 
-  // 1. Search Brazilian Branded Foods
-  for (const item of BRAZILIAN_FOODS) {
+  for (const item of getLocalCatalogFoods()) {
     const itemCat = classifyFoodCategory(item);
     if (categoryFilter !== 'all' && itemCat !== categoryFilter) continue;
 
@@ -259,34 +250,14 @@ export function searchLocalBrazilianFoods(query: string, categoryFilter: FoodCat
       else if (normName.includes(normQuery)) score += 30;
       else if (normBrand.includes(normQuery)) score += 20;
 
+      const isTaco = item.catalogSource === 'taco';
       results.push({
         ...item,
-        isBrazilianBrand: true,
-        sourceBadge: item.brand || 'Marca Brasileira',
+        isTacoResult: isTaco,
+        isBrazilianBrand: item.catalogSource === 'brazilian' || item.catalogSource === 'manufacturer',
+        sourceBadge: isTaco ? 'TACO (UNICAMP)' : item.brand || item.catalogSource.toUpperCase(),
         searchScore: score,
         foodCategory: itemCat
-      });
-    }
-  }
-
-  // 2. Search UNICAMP TACO Foods
-  for (const taco of TACO_FOODS) {
-    const tacoCat = classifyFoodCategory(taco);
-    if (categoryFilter !== 'all' && tacoCat !== categoryFilter) continue;
-
-    const normName = normalizeSearchString(taco.name);
-    if (matchesQueryTokens(normName, queryTokens)) {
-      let score = 45;
-      if (normName === normQuery) score += 100;
-      else if (normName.startsWith(normQuery)) score += 50;
-      else if (normName.includes(normQuery)) score += 25;
-
-      results.push({
-        ...taco,
-        isTacoResult: true,
-        sourceBadge: 'TACO (UNICAMP)',
-        searchScore: score,
-        foodCategory: tacoCat
       });
     }
   }

@@ -110,22 +110,23 @@ export function getStoredProfile(userId?: string): UserProfile {
     const raw = localStorage.getItem(key)
       || localStorage.getItem(legacyKey)
       || (userId ? localStorage.getItem(USER_PROFILE_KEY) || localStorage.getItem(LEGACY_USER_PROFILE_KEY) : null);
+
     if (raw) {
       const parsed = JSON.parse(raw);
-      const isMockName = parsed.name === 'Arthur Davi';
-      const isMockWeight = (parsed.startWeightKg === 65 && parsed.currentWeightKg === 65 && parsed.goalWeightKg === 60);
-      const isCompleted = parsed.isOnboardingCompleted === true && !isMockWeight;
+      const isCompleted = Boolean(parsed.isOnboardingCompleted) ||
+        (Boolean(parsed.currentWeightKg && Number(parsed.currentWeightKg) > 0) && Boolean(parsed.name && parsed.name !== 'Meu Perfil'));
 
       return {
         ...DEFAULT_PROFILE,
         ...parsed,
-        name: isMockName ? 'Meu Perfil' : parsed.name,
-        avatarText: isMockName ? 'M' : (parsed.avatarText || 'M'),
-        gems: parsed.gems === 1620 ? 0 : (parsed.gems || 0),
-        startWeightKg: isMockWeight ? 0 : (Number(parsed.startWeightKg) || 0),
-        currentWeightKg: isMockWeight ? 0 : (Number(parsed.currentWeightKg) || 0),
-        goalWeightKg: isMockWeight ? 0 : (Number(parsed.goalWeightKg) || 0),
-        heightCm: (parsed.heightCm === 170 && isMockWeight) ? 0 : (Number(parsed.heightCm) || 0),
+        name: parsed.name || DEFAULT_PROFILE.name,
+        avatarText: parsed.avatarText || (parsed.name ? parsed.name[0].toUpperCase() : 'M'),
+        avatarUrl: parsed.avatarUrl || '',
+        gems: Number(parsed.gems) || 0,
+        startWeightKg: Number(parsed.startWeightKg) || 0,
+        currentWeightKg: Number(parsed.currentWeightKg) || 0,
+        goalWeightKg: Number(parsed.goalWeightKg) || 0,
+        heightCm: Number(parsed.heightCm) || 0,
         inventory: Array.isArray(parsed.inventory) ? parsed.inventory : [],
         equippedCap: parsed.equippedCap !== undefined ? parsed.equippedCap : null,
         equippedGlasses: parsed.equippedGlasses !== undefined ? parsed.equippedGlasses : null,

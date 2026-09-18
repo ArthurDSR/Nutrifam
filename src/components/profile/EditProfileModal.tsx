@@ -39,7 +39,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       const result = await uploadAvatarImage(file, profile.id);
       if (result.success && result.url) {
         setAvatarUrl(result.url);
-      } else if (result.error) {
+        onSaveProfile({
+          ...profile,
+          avatarUrl: result.url
+        });
+      }
+      if (result.error) {
         setUploadError(result.error);
       }
     } catch (err: any) {
@@ -176,7 +181,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               {avatarUrl && !isUploadingPhoto && (
                 <button
                   type="button"
-                  onClick={() => setAvatarUrl('')}
+                  onClick={() => {
+                    setAvatarUrl('');
+                    onSaveProfile({
+                      ...profile,
+                      avatarUrl: undefined
+                    });
+                  }}
                   className="text-[11px] font-medium text-rose-500 hover:text-rose-600 transition-colors flex items-center gap-0.5"
                 >
                   <Trash2 className="w-3 h-3" />

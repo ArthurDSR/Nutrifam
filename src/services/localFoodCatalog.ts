@@ -1,20 +1,21 @@
 import { BRAZILIAN_FOODS } from '../data/brazilianFoods';
 import { TACO_FOODS } from '../data/tacoFoods';
+import generatedFoods from '../data/generatedFoodCatalog.json';
 import { FoodItem } from '../types';
 
-export const LOCAL_CATALOG_VERSION = '2026.09.1';
+export const LOCAL_CATALOG_VERSION = '2026.09.2';
 
 const DB_NAME = 'nutrifam-food-catalog';
 const DB_VERSION = 1;
 const FOOD_STORE = 'foods';
 const META_STORE = 'metadata';
 
-export type CatalogSource = 'taco' | 'brazilian' | 'user';
+export type CatalogSource = 'taco' | 'brazilian' | 'manufacturer' | 'tbca' | 'usda' | 'canonical' | 'user';
 
 export interface LocalCatalogFood extends FoodItem {
   catalogSource: CatalogSource;
   normalizedName: string;
-  verificationStatus: 'verified' | 'user';
+  verificationStatus: 'verified' | 'pending' | 'user';
 }
 
 export const normalizeCatalogText = (value: string): string =>
@@ -36,7 +37,8 @@ const asCatalogFood = (food: FoodItem, catalogSource: CatalogSource): LocalCatal
   barcode: normalizeBarcode(food.barcode),
   catalogSource,
   normalizedName: normalizeCatalogText(`${food.name} ${food.brand || ''}`),
-  verificationStatus: catalogSource === 'user' ? 'user' : 'verified'
+  verificationStatus: food.verificationStatus
+    ?? (catalogSource === 'user' ? 'user' : catalogSource === 'manufacturer' ? 'pending' : 'verified')
 });
 
 const deduplicate = (foods: LocalCatalogFood[]): LocalCatalogFood[] => {
@@ -52,6 +54,7 @@ const deduplicate = (foods: LocalCatalogFood[]): LocalCatalogFood[] => {
 };
 
 const STATIC_CATALOG = deduplicate([
+  ...(generatedFoods as FoodItem[]).map((food) => asCatalogFood(food, (food.catalogSource || 'canonical') as CatalogSource)),
   ...TACO_FOODS.map((food) => asCatalogFood(food, 'taco')),
   ...BRAZILIAN_FOODS.map((food) => asCatalogFood(food, 'brazilian'))
 ]);
@@ -111,4 +114,3 @@ export async function initializeLocalFoodCatalog(): Promise<void> {
   });
   db.close();
 }
-

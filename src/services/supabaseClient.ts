@@ -157,28 +157,22 @@ export async function loadProfileFromSupabase(userId?: string): Promise<UserProf
     const goalWeight = Number(data.goal_weight_kg) || 0;
     const startWeight = Number(data.start_weight_kg) || currentWeight || 0;
 
-    // Detect legacy mock/template data (65kg/60kg or 60kg/55kg from initial schemas)
-    const isLegacyMock =
-      (currentWeight === 65 && goalWeight === 60) ||
-      (currentWeight === 60 && goalWeight === 55) ||
-      (currentWeight === 0 && goalWeight === 0);
-
-    const hasRealBiometrics = !isLegacyMock && currentWeight > 0 && goalWeight > 0;
-    const sanitizedCurrent = hasRealBiometrics ? currentWeight : 0;
-    const sanitizedGoal = hasRealBiometrics ? goalWeight : 0;
-    const sanitizedStart = hasRealBiometrics ? startWeight : 0;
+    const hasAccountData =
+      Boolean(data.is_onboarding_completed) ||
+      (currentWeight > 0) ||
+      Boolean(data.name && data.name !== 'Meu Perfil');
 
     return {
       id: data.id,
       email: data.email,
       name: data.name,
-      avatarText: data.avatar_text || 'A',
+      avatarText: data.avatar_text || (data.name ? data.name[0].toUpperCase() : 'A'),
       avatarUrl: data.avatar_url || undefined,
       goalType: data.goal_type || 'Lose weight',
       heightCm: Number(data.height_cm) || 0,
-      startWeightKg: sanitizedStart,
-      currentWeightKg: sanitizedCurrent,
-      goalWeightKg: sanitizedGoal,
+      startWeightKg: startWeight,
+      currentWeightKg: currentWeight,
+      goalWeightKg: goalWeight,
       dailyCaloriesTarget: Number(data.daily_calories_target) || 2000,
       targetMacros: data.target_macros || {
         proteinGrams: 120,
@@ -203,7 +197,7 @@ export async function loadProfileFromSupabase(userId?: string): Promise<UserProf
       equippedClothes: data.equipped_clothes !== undefined ? data.equipped_clothes : null,
       showSplashAnimation: data.show_splash_animation !== undefined ? Boolean(data.show_splash_animation) : true,
       geminiApiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || '',
-      isOnboardingCompleted: hasRealBiometrics
+      isOnboardingCompleted: Boolean(data.is_onboarding_completed) || hasAccountData
     };
   } catch (err) {
     console.warn('Error loading profile from Supabase:', err);
@@ -247,6 +241,7 @@ export async function saveProfileToSupabase(profile: UserProfile, userId?: strin
       equipped_glasses: profile.equippedGlasses,
       equipped_clothes: profile.equippedClothes,
       show_splash_animation: profile.showSplashAnimation,
+      is_onboarding_completed: Boolean(profile.isOnboardingCompleted),
       updated_at: new Date().toISOString()
     };
 
@@ -339,13 +334,13 @@ export async function uploadAvatarImage(
   userId?: string
 ): Promise<{ success: boolean; url: string; error?: string }> {
   try {
-    // 1. Compressão client-side
-    const { blob, dataUrl } = await compressAvatarImage(file, 800, 0.85);
+    // 1. Compressão client-side (400x400 JPG, ~45KB, ideal para fotos de perfil)
+    const { blob, dataUrl } = await compressAvatarImage(file, 400, 0.82);
 
     const client = getSupabase();
     const targetUserId = userId || (await getActiveUserId()) || 'local_user';
 
-    // 2. Se o Supabase não estiver configurado ou usuário não autenticado, usa Data URL Base64
+    // 2. Se o Supabase não estiver configurado ou usuário não autenticado, usa Data URL Base64 local
     if (!client || targetUserId === 'local_user') {
       return { success: true, url: dataUrl };
     }
@@ -364,17 +359,31 @@ export async function uploadAvatarImage(
       });
 
     if (uploadError) {
-      console.warn('Supabase storage upload error, fallback para dataUrl:', uploadError.message);
+      console.warn('Supabase storage upload error:', uploadError.message);
+      const isBucketNotFound = uploadError.message?.toLowerCase().includes('bucket not found') ||
+                               uploadError.message?.toLowerCase().includes('not found');
       return {
         success: true,
         url: dataUrl,
-        error: uploadError.message
+        error: isBucketNotFound
+          ? "O bucket 'avatars' ainda não foi criado no Supabase. Execute o script de migração no SQL Editor."
+          : uploadError.message
       };
     }
 
     // 5. Obter URL pública do Supabase Storage
     const { data } = client.storage.from('avatars').getPublicUrl(filePath);
     if (data?.publicUrl) {
+      // Salva imediatamente a coluna avatar_url na tabela profiles para sincronização instantânea
+      try {
+        await client
+          .from('profiles')
+          .update({ avatar_url: data.publicUrl, updated_at: new Date().toISOString() })
+          .eq('id', targetUserId);
+      } catch (dbErr) {
+        console.warn('Erro ao atualizar avatar_url na tabela profiles:', dbErr);
+      }
+
       return { success: true, url: data.publicUrl };
     }
 

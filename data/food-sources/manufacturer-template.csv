@@ -1,0 +1,2 @@
+name,brand,barcode,calories,serving_grams,serving_label,protein,carbs,fat,fiber,nova_group,category,source_id
+Exemplo de produto,Marca Exemplo,7890000000000,120,30,1 porção (30 g),3,18,4,2,3,Lanches,sku-001

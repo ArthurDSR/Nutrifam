@@ -35,6 +35,7 @@ interface OnboardingSurveyProps {
   existingProfile?: UserProfile;
   isRedoing?: boolean;
   onClose?: () => void;
+  onOpenLogin?: () => void;
 }
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -54,7 +55,8 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
   onComplete,
   existingProfile,
   isRedoing = false,
-  onClose
+  onClose,
+  onOpenLogin
 }) => {
   const { isDark } = useTheme();
   const isUserRedoing = Boolean(
@@ -594,7 +596,17 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
           </span>
         </div>
 
-        <div className="w-14 flex items-center justify-end gap-1.5">
+        <div className="w-24 flex items-center justify-end gap-1.5">
+          {onOpenLogin && currentStep === 1 && (
+            <button
+              type="button"
+              onClick={onOpenLogin}
+              className="text-[11px] font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 px-2.5 py-1 rounded-full transition shrink-0"
+              title="Acessar com conta existente"
+            >
+              Entrar
+            </button>
+          )}
           {currentStep === 7 && (
             <button
               onClick={() => setCurrentStep(8)}
@@ -700,6 +712,28 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
                 </p>
               </div>
             </div>
+
+            {/* Quick Login Option for Users with Existing Account */}
+            {onOpenLogin && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white leading-tight">Já possui uma conta?</p>
+                    <p className="text-[11px] text-slate-300">Carregue seus dados, mascote e metas direto da nuvem.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onOpenLogin}
+                  className="w-full sm:w-auto px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition active:scale-95 shrink-0"
+                >
+                  Fazer Login
+                </button>
+              </div>
+            )}
           </div>
         )}
 
