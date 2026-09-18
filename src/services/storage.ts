@@ -1,6 +1,6 @@
 import { UserProfile, DayLog, WeightEntry, FoodItem } from '../types';
-import { INITIAL_FOOD_DATABASE } from './foodDatabase';
 import { getMealTargetsForCalories } from './nutritionCalculator';
+import { INITIAL_FOOD_DATABASE } from './foodDatabase';
 
 const USER_PROFILE_KEY = 'nutrifam_user_profile';
 const DAY_LOGS_KEY = 'nutrifam_day_logs';
@@ -226,11 +226,15 @@ export function saveStoredDayLogs(logs: Record<string, DayLog>, userId?: string)
 export function getStoredCustomFoods(): FoodItem[] {
   try {
     const raw = localStorage.getItem(CUSTOM_FOODS_KEY) || localStorage.getItem(LEGACY_CUSTOM_FOODS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const stored = JSON.parse(raw) as FoodItem[];
+      const legacyIds = new Set(INITIAL_FOOD_DATABASE.map((food) => food.id));
+      return stored.filter((food) => !legacyIds.has(food.id));
+    }
   } catch (e) {
     console.error('Error loading custom foods:', e);
   }
-  return INITIAL_FOOD_DATABASE;
+  return [];
 }
 
 export function saveStoredCustomFoods(foods: FoodItem[]): void {

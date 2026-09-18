@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Check, Loader2, Globe, Sparkles, X, Wand2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, Plus, Check, Loader2, Sparkles, X, Wand2, Database } from 'lucide-react';
 import { FoodItem } from '../../types';
 import { useTranslation } from '../../services/i18n';
 import { useTheme } from '../../services/themeService';
 import {
-  searchFoodsOnline,
   searchLocalBrazilianFoods,
   getPopularFoodsByCategory,
   classifyFoodCategory,
@@ -53,8 +52,6 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<FoodCategoryKey>('all');
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
-  const [isSearchingOnline, setIsSearchingOnline] = useState(false);
-  const [onlineResults, setOnlineResults] = useState<OnlineFoodItem[]>([]);
   const [aiEstimatedItems, setAiEstimatedItems] = useState<OnlineFoodItem[]>([]);
   const [isEstimatingAi, setIsEstimatingAi] = useState(false);
 
@@ -112,37 +109,6 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
     return merged;
   }, [query, selectedCategory, foods]);
 
-  // Debounced online search for long-tail items from Open Food Facts
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 3) {
-      setOnlineResults([]);
-      setIsSearchingOnline(false);
-      return;
-    }
-
-    setIsSearchingOnline(true);
-    const timer = setTimeout(async () => {
-      try {
-        const results = await searchFoodsOnline(trimmed, selectedCategory);
-        const onlyOnline = results.filter((r) => r.isOnlineResult);
-        const existingKeys = new Set(
-          localResults.map((l) => normalizeSearchString(`${l.name} ${l.brand || ''}`))
-        );
-        const uniqueOnline = onlyOnline.filter(
-          (r) => !existingKeys.has(normalizeSearchString(`${r.name} ${r.brand || ''}`))
-        );
-        setOnlineResults(uniqueOnline);
-      } catch {
-        setOnlineResults([]);
-      } finally {
-        setIsSearchingOnline(false);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [query, selectedCategory, localResults]);
-
   // 1-Tap AI Nutrition Estimation
   const handleEstimateWithAi = async () => {
     const trimmed = query.trim();
@@ -183,14 +149,14 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
     }, 900);
   };
 
-  // Combine AI items first, then local matches, then online products
+  // AI estimates are explicit; catalog results always come from local data.
   const combinedResults: (FoodItem & {
     isOnlineResult?: boolean;
     isBrazilianBrand?: boolean;
     isTacoResult?: boolean;
     isAiResult?: boolean;
     imageUrl?: string;
-  })[] = [...aiEstimatedItems, ...localResults, ...onlineResults];
+  })[] = [...aiEstimatedItems, ...localResults];
 
   return (
     <div className="flex-1 min-h-0 h-full flex flex-col px-4 pt-3 pb-0 overflow-hidden">
@@ -217,9 +183,6 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
             >
               <X className="w-3.5 h-3.5" />
             </button>
-          )}
-          {isSearchingOnline && (
-            <Loader2 className="w-4 h-4 animate-spin" style={{ color: activeColor.primary }} />
           )}
         </div>
       </div>
@@ -257,11 +220,9 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
               : `${combinedResults.length} alimentos em ${CATEGORIES.find((c) => c.key === selectedCategory)?.label}`}
           </span>
         </span>
-        {isSearchingOnline && (
-          <span className="flex items-center gap-1 text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] shrink-0">
-            <Globe className="w-3 h-3 text-sky-500 shrink-0" /> Buscando na web...
-          </span>
-        )}
+        <span className="flex items-center gap-1 text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] shrink-0">
+          <Database className="w-3 h-3 shrink-0" style={{ color: activeColor.primary }} /> Catálogo local
+        </span>
       </div>
 
       {/* AI Smart Estimator Quick Action Bar when user is searching */}
@@ -299,12 +260,6 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
       >
         {combinedResults.length === 0 ? (
           <div className="text-center py-8 px-4 text-slate-400 text-xs">
-            {isSearchingOnline ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-4">
-                <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-                <span>Consultando bancos de dados...</span>
-              </div>
-            ) : (
               <div className="flex flex-col items-center justify-center gap-3">
                 <p className="text-slate-500 font-medium">
                   Nenhum alimento pré-cadastrado encontrado para "{query}".
@@ -323,7 +278,6 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
                   <span>Calcular "{query}" com IA</span>
                 </button>
               </div>
-            )}
           </div>
         ) : (
           combinedResults.map((food) => {
@@ -340,7 +294,7 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
                   isAi ? 'bg-purple-50/40 dark:bg-purple-950/20 border border-purple-200/50 dark:border-purple-800/40 my-1' : ''
                 }`}
               >
-                {/* Product Thumbnail if available from Open Food Facts */}
+                {/* Optional locally catalogued product thumbnail */}
                 {food.imageUrl && (
                   <img
                     src={food.imageUrl}
@@ -371,11 +325,6 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
                     ) : isBrBrand ? (
                       <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
                         🇧🇷 {food.brand}
-                      </span>
-                    ) : food.isOnlineResult ? (
-                      <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-800/40">
-                        <Globe className="w-2.5 h-2.5" />
-                        Open Food Facts
                       </span>
                     ) : null}
                   </div>

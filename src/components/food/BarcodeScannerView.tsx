@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, ScanLine, Search, Loader2, RefreshCw, CheckCircle2, Zap } from 'lucide-react';
-import { fetchProductByBarcode } from '../../services/openFoodFactsService';
+import { fetchProductByBarcode } from '../../services/localBarcodeService';
 import { ProductEvaluation } from '../../types';
 import { useTheme } from '../../services/themeService';
 

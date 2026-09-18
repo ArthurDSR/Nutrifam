@@ -298,8 +298,8 @@ export function searchLocalBrazilianFoods(query: string, categoryFilter: FoodCat
 }
 
 /**
- * Hybrid search: Combines verified Brazilian Brands + TACO staples WITH Open Food Facts.
- * Open Food Facts is queried with robust JSON verification and 503 resilience.
+ * Compatibility wrapper kept for callers migrated from the former online search.
+ * Results now come exclusively from the versioned local catalog.
  */
 export async function searchFoodsOnline(query: string, categoryFilter: FoodCategoryKey = 'all'): Promise<EnhancedFoodItem[]> {
   const clean = query.trim();
@@ -311,115 +311,9 @@ export async function searchFoodsOnline(query: string, categoryFilter: FoodCateg
     return queryCache.get(cacheKey)!;
   }
 
-  // 1. Instant verified matches (Brazilian Brands & TACO)
   const localResults = searchLocalBrazilianFoods(clean, categoryFilter);
-  const queryTokens = norm.split(' ').filter(Boolean);
-
-  // 2. Query Open Food Facts with safety and fallback
-  let offResults: EnhancedFoodItem[] = [];
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-    const encodedQuery = encodeURIComponent(clean);
-    // Use search.pl endpoint which is standard and supports broad keyword search
-    const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodedQuery + '&search_simple=1&action=process&json=1&page_size=20';
-
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'NutriFamApp/2.0 (contact@nutrifam.app)',
-        'Accept': 'application/json'
-      }
-    });
-
-    clearTimeout(timeoutId);
-
-    const contentType = response.headers.get('content-type') || '';
-    if (response.ok && contentType.includes('json')) {
-      const data = await response.json();
-      const rawProducts = data.products || [];
-
-      offResults = rawProducts
-        .filter((p: any) => {
-          if (!p.product_name && !p.product_name_pt) return false;
-          if (!p.nutriments) return false;
-
-          const pName = p.product_name_pt || p.product_name;
-          const normName = normalizeSearchString(pName);
-          const normBrand = normalizeSearchString(p.brands || '');
-          const combined = normName + ' ' + normBrand;
-
-          // Must match query tokens
-          const hasKeywordMatch = matchesQueryTokens(combined, queryTokens);
-          if (!hasKeywordMatch) return false;
-
-          const cal = Math.round(p.nutriments['energy-kcal_100g'] || p.nutriments['energy-kcal'] || 0);
-          if (cal <= 0 || cal > 950) return false;
-
-          return true;
-        })
-        .slice(0, 15)
-        .map((p: any) => {
-          const nutriments = p.nutriments || {};
-          const cal = Math.round(nutriments['energy-kcal_100g'] || nutriments['energy-kcal'] || 0);
-          const prot = Number((nutriments.proteins_100g || 0).toFixed(1));
-          const carbs = Number((nutriments.carbohydrates_100g || 0).toFixed(1));
-          const fat = Number((nutriments.fat_100g || 0).toFixed(1));
-          const fiber = Number((nutriments.fiber_100g || 0).toFixed(1));
-
-          let colorDot = '#f97316';
-          if (prot > 15) colorDot = '#3b82f6';
-          else if (cal < 100) colorDot = '#10b981';
-          else if (fat > 15) colorDot = '#eab308';
-
-          const productName = p.product_name_pt || p.product_name;
-
-          const item: EnhancedFoodItem = {
-            id: 'off_' + (p.code || Math.random().toString(36).substr(2, 7)),
-            name: productName,
-            brand: p.brands || 'Marca Nacional',
-            calories: cal,
-            servingSize: p.serving_size || '100 g',
-            servingGrams: 100,
-            servingUnitName: 'porção',
-            protein: prot,
-            carbs: carbs,
-            fat: fat,
-            fiber: fiber,
-            colorDot,
-            barcode: p.code,
-            imageUrl: p.image_front_small_url,
-            category: 'Food' as const,
-            isOnlineResult: true,
-            sourceBadge: 'Open Food Facts'
-          };
-
-          item.foodCategory = classifyFoodCategory(item);
-          return item;
-        });
-    }
-  } catch {
-    // Silently continue on timeout or 503 error
-  }
-
-  // Filter category on online results if specified
-  const filteredOff = categoryFilter === 'all'
-    ? offResults
-    : offResults.filter((o) => o.foodCategory === categoryFilter);
-
-  // Merge results: Brazilian Brands & TACO first, then Open Food Facts without duplicates
-  const existingKeys = new Set(
-    localResults.map((it) => normalizeSearchString(it.name + ' ' + (it.brand || '')))
-  );
-
-  const uniqueOff = filteredOff.filter(
-    (o) => !existingKeys.has(normalizeSearchString(o.name + ' ' + (o.brand || '')))
-  );
-
-  const combined = [...localResults, ...uniqueOff];
-  queryCache.set(cacheKey, combined);
-  return combined;
+  queryCache.set(cacheKey, localResults);
+  return localResults;
 }
 
 /**

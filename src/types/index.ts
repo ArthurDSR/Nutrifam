@@ -16,6 +16,9 @@ export interface FoodItem {
   colorDot?: string; // color dot indicator in search list
   barcode?: string;
   imageUrl?: string;
+  catalogSource?: 'taco' | 'brazilian' | 'manufacturer' | 'user' | 'legacy';
+  normalizedName?: string;
+  verificationStatus?: 'verified' | 'pending' | 'user';
   novaGroup?: 1 | 2 | 3 | 4; // 1: In natura, 2: Culinário, 3: Processado, 4: Ultraprocessado
   processingGrade?: 'In Natura' | 'Minimamente Processado' | 'Processado' | 'Ultraprocessado';
   healthScore?: number; // 0 to 100

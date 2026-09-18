@@ -33,6 +33,7 @@ import { getLocalAuthUser, setLocalAuthUser, logoutAccount, AuthUser } from './s
 import { calculateFastingWindow } from './services/fastingScheduler';
 import { syncDayLogMealTargets } from './services/nutritionCalculator';
 import { syncExercisesFromSupabase } from './services/exerciseDatabase';
+import { initializeLocalFoodCatalog } from './services/localFoodCatalog';
 
 import {
   UserProfile,
@@ -85,6 +86,12 @@ export const App: React.FC = () => {
   const [profileSubTab, setProfileSubTab] = useState<ProfileSubTab>('weight');
 
   // Detect shared workout link on mount
+  useEffect(() => {
+    initializeLocalFoodCatalog().catch((error) => {
+      console.error('Não foi possível inicializar o catálogo local de alimentos:', error);
+    });
+  }, []);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search) {
       const params = new URLSearchParams(window.location.search);
