@@ -5,7 +5,7 @@ import { useTranslation, Language } from '../../services/i18n';
 import { testAIConnection } from '../../services/aiService';
 import { useTheme, PASTEL_COLORS, SecondaryColor, ThemeMode } from '../../services/themeService';
 import { FoodBudMascot } from '../pet/FoodBudMascot';
-import { isSupabaseConfigured, getSupabaseCredentials, testSupabaseConnection } from '../../services/supabaseClient';
+import { isSupabaseConfigured, getSupabaseCredentials, testSupabaseConnection, saveSupabaseCredentials } from '../../services/supabaseClient';
 
 interface SettingsModalProps {
   profile: UserProfile;
@@ -90,6 +90,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const supabaseConfigured = isSupabaseConfigured();
   const supabaseCreds = getSupabaseCredentials();
 
+  const [showManualConfig, setShowManualConfig] = useState(false);
+  const [manualUrl, setManualUrl] = useState(supabaseCreds.url);
+  const [manualKey, setManualKey] = useState(supabaseCreds.anonKey);
+  const [manualSuccessMsg, setManualSuccessMsg] = useState<string | null>(null);
+
   const handleTestSupabase = async () => {
     setIsTestingSupabase(true);
     setSupabaseTestStatus(null);
@@ -119,6 +124,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } finally {
       setIsTestingSupabase(false);
     }
+  };
+
+  const handleSaveManualSupabase = () => {
+    saveSupabaseCredentials(manualUrl, manualKey);
+    setManualSuccessMsg('Credenciais salvas com sucesso!');
+    setTimeout(() => setManualSuccessMsg(null), 3500);
+    handleTestSupabase();
   };
 
   const handleSaveAll = (e: React.FormEvent) => {
@@ -475,6 +487,67 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   💡 Na Vercel, conecte a integração do Supabase ou configure <b>VITE_SUPABASE_URL</b> e <b>VITE_SUPABASE_ANON_KEY</b> nas variáveis de ambiente.
                 </p>
               )}
+
+              {/* Manual Credentials Toggle & Inputs */}
+              <div className="pt-2 border-t border-[#AEBDB5]/20 dark:border-[#394842]">
+                <button
+                  type="button"
+                  onClick={() => setShowManualConfig(!showManualConfig)}
+                  className="text-[11px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] hover:text-[#3F4B46] dark:hover:text-[#EDF2EF] flex items-center justify-between w-full py-1"
+                >
+                  <span>Configurar chaves manualmente</span>
+                  <span className="text-xs">{showManualConfig ? '▲' : '▼'}</span>
+                </button>
+
+                {showManualConfig && (
+                  <div className="mt-2 space-y-2 pt-1 animate-in fade-in">
+                    <div>
+                      <label className="text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] block mb-1">
+                        URL do Supabase
+                      </label>
+                      <input
+                        type="text"
+                        value={manualUrl}
+                        onChange={(e) => setManualUrl(e.target.value)}
+                        placeholder="https://xyzcompany.supabase.co"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#AEBDB5]/40 dark:border-[#394842] font-mono text-[10px] bg-[#F7F4EE] dark:bg-[#18201D] text-[#3F4B46] dark:text-[#EDF2EF] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] block mb-1">
+                        Chave Anon (public / anon key)
+                      </label>
+                      <input
+                        type="password"
+                        value={manualKey}
+                        onChange={(e) => setManualKey(e.target.value)}
+                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#AEBDB5]/40 dark:border-[#394842] font-mono text-[10px] bg-[#F7F4EE] dark:bg-[#18201D] text-[#3F4B46] dark:text-[#EDF2EF] focus:outline-none"
+                      />
+                    </div>
+
+                    {manualSuccessMsg && (
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>{manualSuccessMsg}</span>
+                      </p>
+                    )}
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveManualSupabase}
+                        disabled={!manualUrl.trim() || !manualKey.trim()}
+                        className="py-1 px-3 rounded-lg text-white font-bold text-[11px] shadow-2xs transition-all disabled:opacity-40"
+                        style={{ backgroundColor: activeColor.primary }}
+                      >
+                        Salvar e Conectar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

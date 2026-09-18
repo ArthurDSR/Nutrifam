@@ -12,17 +12,31 @@ type NutriFamGlobal = typeof globalThis & {
 
 const globalCache = globalThis as NutriFamGlobal;
 
+declare const __SUPABASE_URL__: string | undefined;
+declare const __SUPABASE_ANON_KEY__: string | undefined;
+
 export function getSupabaseCredentials(): { url: string; anonKey: string } {
-  const metaEnv = (import.meta as any).env || {};
+  // 1. Literal compile-time define check (Vite replaces these exact symbols during build)
+  let staticUrl = '';
+  let staticKey = '';
+  try {
+    if (typeof __SUPABASE_URL__ === 'string') staticUrl = __SUPABASE_URL__;
+    if (typeof __SUPABASE_ANON_KEY__ === 'string') staticKey = __SUPABASE_ANON_KEY__;
+  } catch {}
+
+  // 2. Direct import.meta.env properties (must be literal import.meta.env for Vite compiler)
   const envUrl =
-    metaEnv.VITE_SUPABASE_URL ||
-    metaEnv.SUPABASE_URL ||
-    metaEnv.NEXT_PUBLIC_SUPABASE_URL ||
+    staticUrl ||
+    import.meta.env.VITE_SUPABASE_URL ||
+    (import.meta.env as any)?.SUPABASE_URL ||
+    (import.meta.env as any)?.NEXT_PUBLIC_SUPABASE_URL ||
     '';
+
   const envKey =
-    metaEnv.VITE_SUPABASE_ANON_KEY ||
-    metaEnv.SUPABASE_ANON_KEY ||
-    metaEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    staticKey ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    (import.meta.env as any)?.SUPABASE_ANON_KEY ||
+    (import.meta.env as any)?.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     '';
 
   const localUrl = localStorage.getItem(STORAGE_URL_KEY) || localStorage.getItem(LEGACY_STORAGE_URL_KEY) || '';
