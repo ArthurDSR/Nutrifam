@@ -14,4 +14,13 @@ O CSV pode usar vírgula ou ponto e vírgula e nomes de colunas em português ou
 
 Cada execução mescla os registros aceitos com o catálogo gerado. O relatório em `import-report.json` lista totais e rejeições. Registros de fabricantes entram como `pending` até revisão, enquanto fontes oficiais entram como `verified`.
 
+## Preparações compostas
+
+Pizza, pastel, coxinha, PF, sanduíches e outras preparações variáveis não entram como alimentos genéricos. Elas são aceitas apenas em dois casos:
+
+- receita com ingredientes, quantidades e rendimento completos;
+- produto embalado com marca e código de barras.
+
+Assim, “Pizza de pizzaria tradicional” é rejeitada, mas uma pizza congelada identificada por GTIN ou uma receita calculada pelo próprio usuário pode ser usada.
+
 Antes de importar uma fonte, registre sua licença e versão. Não distribua arquivos cuja licença proíba redistribuição.

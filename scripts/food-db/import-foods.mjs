@@ -23,6 +23,8 @@ if (!supportedSources.has(source)) {
 const inputPath = path.resolve(String(args.input));
 const outputPath = path.resolve(String(args.output || 'src/data/generatedFoodCatalog.json'));
 const reportPath = path.resolve(String(args.report || 'data/food-sources/import-report.json'));
+const policyPath = path.resolve('src/data/catalogPolicy.json');
+const catalogPolicy = JSON.parse(await readFile(policyPath, 'utf8'));
 
 const normalizeText = (value = '') => String(value)
   .toLowerCase()
@@ -115,6 +117,8 @@ function mapRow(row, index) {
     return number(first(row, fallbackAliases));
   };
 
+  const recipeIngredients = Array.isArray(row.recipeIngredients) ? row.recipeIngredients : undefined;
+  const recipeYieldPortions = number(row.recipeYieldPortions);
   return {
     id: `import_${source}_${hash}`,
     name,
@@ -131,9 +135,17 @@ function mapRow(row, index) {
     category: 'Food',
     catalogSource: source === 'manufacturer' ? 'manufacturer' : source,
     normalizedName: normalizeText(`${name} ${brand}`),
-    verificationStatus: source === 'manufacturer' ? 'pending' : 'verified'
+    verificationStatus: source === 'manufacturer' ? 'pending' : 'verified',
+    ...(row.isRecipe === true && recipeIngredients?.length && recipeYieldPortions > 0
+      ? { isRecipe: true, recipeIngredients, recipeYieldPortions }
+      : {})
   };
 }
+
+const isCompositeDish = (food) => {
+  const normalized = ` ${normalizeText(food.name)} `;
+  return catalogPolicy.compositeDishTerms.some((term) => normalized.includes(` ${term} `));
+};
 
 function validate(food) {
   const errors = [];
@@ -148,6 +160,13 @@ function validate(food) {
     errors.push('macronutriente acima de 100g/100g');
   }
   if (!food.calories && !food.protein && !food.carbs && !food.fat && !food.fiber) errors.push('sem dados nutricionais');
+  if (isCompositeDish(food)) {
+    const completeRecipe = food.isRecipe && food.recipeYieldPortions > 0 && food.recipeIngredients?.length;
+    const identifiedPackage = food.barcode && food.brand;
+    if (!completeRecipe && !identifiedPackage) {
+      errors.push('preparação composta sem receita completa ou produto embalado com marca e código de barras');
+    }
+  }
   return errors;
 }
 
@@ -179,6 +198,10 @@ try {
 } catch {}
 const merged = new Map();
 for (const food of [...existing, ...accepted]) {
+  const compositeAllowed = !isCompositeDish(food)
+    || (food.isRecipe && food.recipeYieldPortions > 0 && food.recipeIngredients?.length)
+    || (food.barcode && food.brand);
+  if (!compositeAllowed) continue;
   const key = food.barcode ? `barcode:${food.barcode}` : `${food.normalizedName}:${food.servingGrams}`;
   merged.set(key, food);
 }
@@ -191,6 +214,7 @@ const report = {
   accepted: accepted.length,
   rejected: rejected.length,
   catalogTotal: catalog.length,
+  policyVersion: catalogPolicy.policyVersion,
   rejectionDetails: rejected.slice(0, 1000)
 };
 

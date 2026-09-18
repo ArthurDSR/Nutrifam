@@ -2,8 +2,10 @@ import { BRAZILIAN_FOODS } from '../data/brazilianFoods';
 import { TACO_FOODS } from '../data/tacoFoods';
 import generatedFoods from '../data/generatedFoodCatalog.json';
 import { FoodItem } from '../types';
+import { isCatalogEligibleFood } from './foodCatalogPolicy';
+import { normalizeCatalogText } from './localFoodCatalogText';
 
-export const LOCAL_CATALOG_VERSION = '2026.09.2';
+export const LOCAL_CATALOG_VERSION = '2026.09.3';
 
 const DB_NAME = 'nutrifam-food-catalog';
 const DB_VERSION = 1;
@@ -18,14 +20,7 @@ export interface LocalCatalogFood extends FoodItem {
   verificationStatus: 'verified' | 'pending' | 'user';
 }
 
-export const normalizeCatalogText = (value: string): string =>
-  value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+export { normalizeCatalogText } from './localFoodCatalogText';
 
 const normalizeBarcode = (value?: string): string | undefined => {
   const digits = value?.replace(/\D/g, '');
@@ -57,7 +52,7 @@ const STATIC_CATALOG = deduplicate([
   ...(generatedFoods as FoodItem[]).map((food) => asCatalogFood(food, (food.catalogSource || 'canonical') as CatalogSource)),
   ...TACO_FOODS.map((food) => asCatalogFood(food, 'taco')),
   ...BRAZILIAN_FOODS.map((food) => asCatalogFood(food, 'brazilian'))
-]);
+].filter(isCatalogEligibleFood));
 
 export const getLocalCatalogFoods = (): readonly LocalCatalogFood[] => STATIC_CATALOG;
 
