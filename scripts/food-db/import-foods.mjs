@@ -160,6 +160,9 @@ function validate(food) {
     errors.push('macronutriente acima de 100g/100g');
   }
   if (!food.calories && !food.protein && !food.carbs && !food.fat && !food.fiber) errors.push('sem dados nutricionais');
+  if (source === 'manufacturer' && (!food.brand || !food.barcode)) {
+    errors.push('produto de fabricante exige marca e código de barras');
+  }
   if (isCompositeDish(food)) {
     const completeRecipe = food.isRecipe && food.recipeYieldPortions > 0 && food.recipeIngredients?.length;
     const identifiedPackage = food.barcode && food.brand;

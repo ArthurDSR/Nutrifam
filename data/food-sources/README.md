@@ -24,3 +24,5 @@ Pizza, pastel, coxinha, PF, sanduíches e outras preparações variáveis não e
 Assim, “Pizza de pizzaria tradicional” é rejeitada, mas uma pizza congelada identificada por GTIN ou uma receita calculada pelo próprio usuário pode ser usada.
 
 Antes de importar uma fonte, registre sua licença e versão. Não distribua arquivos cuja licença proíba redistribuição.
+
+As fontes aprovadas e seus limites de uso estão em `source-registry.json`. A prioridade é TBCA para alimentos brasileiros simples e USDA Foundation Foods para preencher lacunas. Bases de consumo e receitas genéricas, como FNDDS, não são importadas integralmente.

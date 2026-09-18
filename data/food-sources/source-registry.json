@@ -1,0 +1,24 @@
+{
+  "tbca": {
+    "name": "Tabela Brasileira de Composição de Alimentos",
+    "officialUrl": "https://www.tbca.net.br/",
+    "preferredScope": "Alimentos simples, in natura ou minimamente processados, com composição por 100 g",
+    "excludedScope": "Preparações calculadas sem lista completa de ingredientes e rendimento",
+    "credit": "TBCA — Universidade de São Paulo e BRASILFOODS",
+    "reviewRequired": true
+  },
+  "usda": {
+    "name": "USDA FoodData Central",
+    "officialUrl": "https://fdc.nal.usda.gov/download-datasets/",
+    "preferredScope": "Foundation Foods; SR Legacy apenas para cobrir lacunas",
+    "excludedScope": "FNDDS e pratos compostos genéricos; Branded sem GTIN/UPC",
+    "credit": "USDA FoodData Central",
+    "reviewRequired": true
+  },
+  "manufacturer": {
+    "name": "Dados fornecidos pelo fabricante",
+    "preferredScope": "Produto embalado com marca, GTIN/EAN e porção declarada no rótulo",
+    "excludedScope": "Estimativas de restaurantes, cardápios locais e produtos sem código de barras",
+    "reviewRequired": true
+  }
+}
