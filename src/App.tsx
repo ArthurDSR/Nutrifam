@@ -32,6 +32,7 @@ import { setupAndroidBackButton } from './services/nativeService';
 import { getLocalAuthUser, setLocalAuthUser, logoutAccount, AuthUser } from './services/authService';
 import { calculateFastingWindow } from './services/fastingScheduler';
 import { syncDayLogMealTargets } from './services/nutritionCalculator';
+import { syncExercisesFromSupabase } from './services/exerciseDatabase';
 
 import {
   UserProfile,
@@ -304,6 +305,9 @@ export const App: React.FC = () => {
             return [...prev, ...newOnes];
           });
         }
+
+        // Sync exercises from user's Supabase database
+        await syncExercisesFromSupabase();
       } catch (err) {
         console.warn('Initial Supabase sync notice:', err);
       }
