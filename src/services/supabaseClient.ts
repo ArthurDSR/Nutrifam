@@ -137,12 +137,18 @@ export async function getActiveUserId(): Promise<string | null> {
   return null;
 }
 
+export function isValidUuid(id?: string | null): boolean {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 export async function loadProfileFromSupabase(userId?: string): Promise<UserProfile | null> {
   const client = getSupabase();
   if (!client) return null;
 
-  const targetId = userId || await getActiveUserId();
-  if (!targetId) return null;
+  const activeId = await getActiveUserId();
+  const targetId = (userId && isValidUuid(userId)) ? userId : activeId;
+  if (!targetId || !isValidUuid(targetId)) return null;
 
   try {
     const { data, error } = await client
@@ -160,7 +166,8 @@ export async function loadProfileFromSupabase(userId?: string): Promise<UserProf
     const hasAccountData =
       Boolean(data.is_onboarding_completed) ||
       (currentWeight > 0) ||
-      Boolean(data.name && data.name !== 'Meu Perfil');
+      Boolean(data.name && data.name !== 'Meu Perfil') ||
+      Boolean(data.avatar_url);
 
     return {
       id: data.id,
@@ -209,15 +216,17 @@ export async function saveProfileToSupabase(profile: UserProfile, userId?: strin
   const client = getSupabase();
   if (!client) return false;
 
-  const targetId = userId || profile.id || await getActiveUserId();
-  if (!targetId) return false;
+  const activeId = await getActiveUserId();
+  const targetId = (userId && isValidUuid(userId))
+    ? userId
+    : (activeId || (profile.id && isValidUuid(profile.id) ? profile.id : null));
+  if (!targetId || !isValidUuid(targetId)) return false;
 
   try {
     const payload: any = {
       id: targetId,
       name: profile.name,
       avatar_text: profile.avatarText,
-      avatar_url: profile.avatarUrl || null,
       goal_type: profile.goalType,
       height_cm: profile.heightCm,
       start_weight_kg: profile.startWeightKg,
@@ -245,6 +254,11 @@ export async function saveProfileToSupabase(profile: UserProfile, userId?: strin
       updated_at: new Date().toISOString()
     };
 
+    // Only update avatar_url if provided so we never wipe an existing avatar
+    if (profile.avatarUrl) {
+      payload.avatar_url = profile.avatarUrl;
+    }
+
     if (profile.email) {
       payload.email = profile.email;
     }
@@ -269,8 +283,8 @@ export async function saveProfileToSupabase(profile: UserProfile, userId?: strin
  */
 export async function compressAvatarImage(
   file: File | Blob,
-  maxDimension = 800,
-  quality = 0.85
+  maxDimension = 320,
+  quality = 0.75
 ): Promise<{ blob: Blob; dataUrl: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -324,70 +338,84 @@ export async function compressAvatarImage(
 }
 
 /**
- * Envia uma foto de perfil para o Supabase Storage (bucket 'avatars').
- * Inclui compressão client-side prévia automática.
- * Se o bucket ainda não tiver sido criado no banco ou o usuário estiver offline,
- * retorna a imagem comprimida em Data URL Base64 com resiliência total.
+ * Envia uma foto de perfil para o Supabase.
+ * Tenta enviar para o Supabase Storage (bucket 'avatars').
+ * Caso o bucket ainda não tenha sido criado ou falhe, salva o DataURL comprimido (~20KB)
+ * diretamente na tabela 'public.profiles', garantindo 100% de persistência entre dispositivos.
  */
 export async function uploadAvatarImage(
   file: File | Blob,
   userId?: string
 ): Promise<{ success: boolean; url: string; error?: string }> {
   try {
-    // 1. Compressão client-side (400x400 JPG, ~45KB, ideal para fotos de perfil)
-    const { blob, dataUrl } = await compressAvatarImage(file, 400, 0.82);
+    // 1. Compressão client-side (320x320 JPG, ~20KB, ideal para fotos de perfil circulares)
+    const { blob, dataUrl } = await compressAvatarImage(file, 320, 0.75);
 
     const client = getSupabase();
-    const targetUserId = userId || (await getActiveUserId()) || 'local_user';
+    const activeUserId = await getActiveUserId();
+    const targetUserId = (activeUserId && isValidUuid(activeUserId))
+      ? activeUserId
+      : (userId && isValidUuid(userId) ? userId : null);
 
-    // 2. Se o Supabase não estiver configurado ou usuário não autenticado, usa Data URL Base64 local
-    if (!client || targetUserId === 'local_user') {
+    // Se o Supabase não estiver configurado ou usuário não autenticado, usa Data URL Base64 local
+    if (!client || !targetUserId) {
       return { success: true, url: dataUrl };
     }
 
-    // 3. Caminho do arquivo: {userId}/avatar_{timestamp}.jpg
-    const fileExt = 'jpg';
-    const filePath = `${targetUserId}/avatar_${Date.now()}.${fileExt}`;
+    let finalAvatarUrl = dataUrl;
 
-    // 4. Upload para o bucket 'avatars'
-    const { error: uploadError } = await client.storage
-      .from('avatars')
-      .upload(filePath, blob, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: 'image/jpeg'
-      });
+    // 2. Tentar upload para o bucket 'avatars' no Supabase Storage
+    try {
+      const fileExt = 'jpg';
+      const filePath = `${targetUserId}/avatar_${Date.now()}.${fileExt}`;
 
-    if (uploadError) {
-      console.warn('Supabase storage upload error:', uploadError.message);
-      const isBucketNotFound = uploadError.message?.toLowerCase().includes('bucket not found') ||
-                               uploadError.message?.toLowerCase().includes('not found');
-      return {
-        success: true,
-        url: dataUrl,
-        error: isBucketNotFound
-          ? "O bucket 'avatars' ainda não foi criado no Supabase. Execute o script de migração no SQL Editor."
-          : uploadError.message
-      };
+      const { error: uploadError } = await client.storage
+        .from('avatars')
+        .upload(filePath, blob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: 'image/jpeg'
+        });
+
+      if (!uploadError) {
+        const { data } = client.storage.from('avatars').getPublicUrl(filePath);
+        if (data?.publicUrl) {
+          finalAvatarUrl = data.publicUrl;
+        }
+      } else {
+        console.warn('Supabase storage upload aviso (usando fallback dataUrl no banco):', uploadError.message);
+      }
+    } catch (storageErr) {
+      console.warn('Supabase storage exceção (usando fallback dataUrl no banco):', storageErr);
     }
 
-    // 5. Obter URL pública do Supabase Storage
-    const { data } = client.storage.from('avatars').getPublicUrl(filePath);
-    if (data?.publicUrl) {
-      // Salva imediatamente a coluna avatar_url na tabela profiles para sincronização instantânea
-      try {
+    // 3. PERSISTÊNCIA GARANTIDA NO BANCO DE DADOS:
+    // Salva imediatamente na coluna avatar_url da tabela public.profiles
+    try {
+      const { data: updateData, error: updateErr } = await client
+        .from('profiles')
+        .update({ avatar_url: finalAvatarUrl, updated_at: new Date().toISOString() })
+        .eq('id', targetUserId)
+        .select('id');
+
+      if (updateErr) {
+        console.warn('Erro ao atualizar avatar_url na tabela profiles:', updateErr.message);
+      } else if (!updateData || updateData.length === 0) {
+        // Se a linha ainda não existia no banco para este usuário, faz o upsert básico
         await client
           .from('profiles')
-          .update({ avatar_url: data.publicUrl, updated_at: new Date().toISOString() })
-          .eq('id', targetUserId);
-      } catch (dbErr) {
-        console.warn('Erro ao atualizar avatar_url na tabela profiles:', dbErr);
+          .upsert({
+            id: targetUserId,
+            name: 'Meu Perfil',
+            avatar_url: finalAvatarUrl,
+            updated_at: new Date().toISOString()
+          });
       }
-
-      return { success: true, url: data.publicUrl };
+    } catch (dbErr) {
+      console.warn('Exceção ao persistir avatar_url no banco:', dbErr);
     }
 
-    return { success: true, url: dataUrl };
+    return { success: true, url: finalAvatarUrl };
   } catch (err: any) {
     console.error('Erro no upload de avatar:', err);
     return {

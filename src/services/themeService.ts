@@ -172,9 +172,15 @@ export function applyThemeToDom(settings: ThemeSettings): boolean {
 
   if (isDark) {
     root.classList.add('dark');
+    root.dataset.theme = 'dark';
   } else {
     root.classList.remove('dark');
+    root.dataset.theme = 'light';
   }
+
+  // `only light` explicitly opts out of Android/Chrome automatic darkening.
+  // A plain `light` value still allows some browsers to transform page colors.
+  root.style.colorScheme = isDark ? 'dark' : 'only light';
 
   // Cozy Pastel Design System CSS Tokens
   const canvasBg = isDark ? '#18201D' : '#F7F4EE';
@@ -202,6 +208,11 @@ export function applyThemeToDom(settings: ThemeSettings): boolean {
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) {
     metaTheme.setAttribute('content', canvasBg);
+  }
+
+  const metaColorScheme = document.querySelector('meta[name="color-scheme"]');
+  if (metaColorScheme) {
+    metaColorScheme.setAttribute('content', isDark ? 'dark' : 'only light');
   }
 
   return isDark;

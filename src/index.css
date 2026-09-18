@@ -12,10 +12,10 @@
     --app-text-main: #3F4B46;
     --app-text-muted: #6F7C76;
     --app-border: #D8DED9;
-    color-scheme: light;
+    color-scheme: only light;
   }
 
-  .dark {
+  :root.dark {
     --app-canvas-bg: #18201D;
     --app-card-bg: #232D29;
     --app-surface-muted: #2A3530;

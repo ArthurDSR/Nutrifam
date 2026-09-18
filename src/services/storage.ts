@@ -108,8 +108,7 @@ export function getStoredProfile(userId?: string): UserProfile {
     const key = userId ? `${USER_PROFILE_KEY}_${userId}` : USER_PROFILE_KEY;
     const legacyKey = userId ? `${LEGACY_USER_PROFILE_KEY}_${userId}` : LEGACY_USER_PROFILE_KEY;
     const raw = localStorage.getItem(key)
-      || localStorage.getItem(legacyKey)
-      || (userId ? localStorage.getItem(USER_PROFILE_KEY) || localStorage.getItem(LEGACY_USER_PROFILE_KEY) : null);
+      || localStorage.getItem(legacyKey);
 
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -183,8 +182,7 @@ export function getStoredDayLogs(userId?: string): Record<string, DayLog> {
     const key = userId ? `${DAY_LOGS_KEY}_${userId}` : DAY_LOGS_KEY;
     const legacyKey = userId ? `${LEGACY_DAY_LOGS_KEY}_${userId}` : LEGACY_DAY_LOGS_KEY;
     const raw = localStorage.getItem(key)
-      || localStorage.getItem(legacyKey)
-      || (userId ? localStorage.getItem(DAY_LOGS_KEY) || localStorage.getItem(LEGACY_DAY_LOGS_KEY) : null);
+      || localStorage.getItem(legacyKey);
     if (raw) {
       const parsed: Record<string, DayLog> = JSON.parse(raw);
       // Ensure past and future days never have an active ticking fasting session

@@ -120,6 +120,7 @@ export const App: React.FC = () => {
   const [isNativeHealthNoticeOpen, setIsNativeHealthNoticeOpen] = useState(false);
 
   const hasLoadedRemote = useRef(false);
+  const cloudProfileOwnerRef = useRef<string | null>(null);
 
   const handleAuthSuccess = async (authUser: AuthUser) => {
     setIsAuthModalOpen(false);
@@ -132,17 +133,20 @@ export const App: React.FC = () => {
           const hasAccountData =
             Boolean(remoteProfile.isOnboardingCompleted) ||
             Boolean(remoteProfile.currentWeightKg && remoteProfile.currentWeightKg > 0) ||
-            Boolean(remoteProfile.name && remoteProfile.name !== 'Meu Perfil');
+            Boolean(remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ||
+            Boolean(remoteProfile.avatarUrl);
 
           const mergedProfile: UserProfile = {
+            ...profile,
             ...remoteProfile,
             id: authUser.id,
             email: authUser.email || remoteProfile.email,
             name: (remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ? remoteProfile.name : (authUser.name || remoteProfile.name),
             avatarText: (remoteProfile.name?.[0] || authUser.name?.[0] || 'A').toUpperCase(),
-            avatarUrl: remoteProfile.avatarUrl || undefined,
+            avatarUrl: remoteProfile.avatarUrl || profile.avatarUrl || undefined,
             isOnboardingCompleted: hasAccountData
           };
+          cloudProfileOwnerRef.current = authUser.id;
           setProfile(mergedProfile);
           saveStoredProfile(mergedProfile);
           if (hasAccountData) {
@@ -176,13 +180,17 @@ export const App: React.FC = () => {
 
     // If no completed remote profile exists, this is a fresh user or onboarding is in progress.
     // Update auth credentials without wiping out survey inputs or pushing empty defaults.
+    cloudProfileOwnerRef.current = authUser.id;
     setProfile((prev) => {
+      const baseProfile = prev.id && prev.id !== authUser.id
+        ? getStoredProfile(authUser.id)
+        : prev;
       const updatedProfile: UserProfile = {
-        ...prev,
+        ...baseProfile,
         id: authUser.id,
         email: authUser.email,
-        name: authUser.name || prev.name,
-        avatarText: (authUser.name?.[0] || prev.name?.[0] || 'A').toUpperCase()
+        name: authUser.name || baseProfile.name,
+        avatarText: (authUser.name?.[0] || baseProfile.name?.[0] || 'A').toUpperCase()
       };
       saveStoredProfile(updatedProfile);
       if (isSupabaseConfigured() && updatedProfile.isOnboardingCompleted && updatedProfile.currentWeightKg > 0) {
@@ -249,7 +257,7 @@ export const App: React.FC = () => {
         });
 
         const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
-          if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+          if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
             const u = session.user;
             const authUser: AuthUser = {
               id: u.id,
@@ -292,40 +300,56 @@ export const App: React.FC = () => {
   useEffect(() => {
     async function initSupabaseSync() {
       if (!isSupabaseConfigured() || hasLoadedRemote.current) return;
-      hasLoadedRemote.current = true;
+
+      const client = getSupabase();
+      if (!client) return;
+
+      // Always sync exercises (public catalog)
+      await syncExercisesFromSupabase();
 
       try {
-        const remoteProfile = await loadProfileFromSupabase();
+        const { data: { session } } = await client.auth.getSession();
+        const currentUserId = session?.user?.id;
+        if (!currentUserId) {
+          // Keep hasLoadedRemote false until sign-in occurs
+          return;
+        }
+
+        hasLoadedRemote.current = true;
+
+        const remoteProfile = await loadProfileFromSupabase(currentUserId);
         if (remoteProfile) {
           const hasAccountData =
             Boolean(remoteProfile.isOnboardingCompleted) ||
             Boolean(remoteProfile.currentWeightKg && remoteProfile.currentWeightKg > 0) ||
-            Boolean(remoteProfile.name && remoteProfile.name !== 'Meu Perfil');
+            Boolean(remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ||
+            Boolean(remoteProfile.avatarUrl);
 
           if (hasAccountData) {
             const completedRemote: UserProfile = {
+              ...profile,
               ...remoteProfile,
+              avatarUrl: remoteProfile.avatarUrl || profile.avatarUrl || undefined,
               isOnboardingCompleted: true
             };
+            cloudProfileOwnerRef.current = remoteProfile.id || null;
             setProfile(completedRemote);
             saveStoredProfile(completedRemote);
             setIsOnboardingSurveyOpen(false);
-          } else if (profile.isOnboardingCompleted && profile.currentWeightKg > 0) {
-            await saveProfileToSupabase(profile);
           }
         }
 
-        const remoteLogs = await loadDayLogsFromSupabase();
+        const remoteLogs = await loadDayLogsFromSupabase(currentUserId);
         if (remoteLogs && Object.keys(remoteLogs).length > 0) {
           setDayLogs((prev) => ({ ...prev, ...remoteLogs }));
         }
 
-        const remoteWeights = await loadWeightEntriesFromSupabase();
+        const remoteWeights = await loadWeightEntriesFromSupabase(currentUserId);
         if (remoteWeights && remoteWeights.length > 0) {
           setWeightEntries(remoteWeights);
         }
 
-        const remoteFoods = await loadCustomFoodsFromSupabase();
+        const remoteFoods = await loadCustomFoodsFromSupabase(currentUserId);
         if (remoteFoods && remoteFoods.length > 0) {
           setCustomFoods((prev) => {
             const existingIds = new Set(prev.map((f) => f.id));
@@ -333,9 +357,6 @@ export const App: React.FC = () => {
             return [...prev, ...newOnes];
           });
         }
-
-        // Sync exercises from user's Supabase database
-        await syncExercisesFromSupabase();
       } catch (err) {
         console.warn('Initial Supabase sync notice:', err);
       }
@@ -347,10 +368,44 @@ export const App: React.FC = () => {
   // Sync to localStorage and Supabase
   useEffect(() => {
     saveStoredProfile(profile);
-    if (isSupabaseConfigured() && profile.isOnboardingCompleted && profile.currentWeightKg > 0) {
+    if (
+      isSupabaseConfigured() &&
+      profile.id &&
+      cloudProfileOwnerRef.current === profile.id &&
+      profile.isOnboardingCompleted &&
+      profile.currentWeightKg > 0
+    ) {
       saveProfileToSupabase(profile);
     }
   }, [profile]);
+
+  // When returning to the app/tab, pull remote changes to stay synced across devices
+  useEffect(() => {
+    if (!profile.id || !isSupabaseConfigured()) return;
+
+    let cancelled = false;
+    const refreshProfileFromCloud = async () => {
+      if (document.visibilityState === 'hidden') return;
+      const remoteProfile = await loadProfileFromSupabase(profile.id);
+      if (!cancelled && remoteProfile) {
+        cloudProfileOwnerRef.current = profile.id!;
+        setProfile((prev) => ({
+          ...prev,
+          ...remoteProfile,
+          avatarUrl: remoteProfile.avatarUrl || prev.avatarUrl
+        }));
+        saveStoredProfile(remoteProfile);
+      }
+    };
+
+    window.addEventListener('focus', refreshProfileFromCloud);
+    document.addEventListener('visibilitychange', refreshProfileFromCloud);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshProfileFromCloud);
+      document.removeEventListener('visibilitychange', refreshProfileFromCloud);
+    };
+  }, [profile.id]);
 
   useEffect(() => {
     saveStoredDayLogs(dayLogs);

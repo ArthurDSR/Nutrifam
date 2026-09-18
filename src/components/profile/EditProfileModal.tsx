@@ -3,7 +3,7 @@ import { X, Check, Calculator, Camera, Trash2, Loader2 } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { calculateNutrition } from '../../services/nutritionCalculator';
 import { useTheme } from '../../services/themeService';
-import { uploadAvatarImage } from '../../services/supabaseClient';
+import { uploadAvatarImage, saveProfileToSupabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
 interface EditProfileModalProps {
   profile: UserProfile;
@@ -39,10 +39,14 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       const result = await uploadAvatarImage(file, profile.id);
       if (result.success && result.url) {
         setAvatarUrl(result.url);
-        onSaveProfile({
+        const updated = {
           ...profile,
           avatarUrl: result.url
-        });
+        };
+        onSaveProfile(updated);
+        if (isSupabaseConfigured() && profile.id) {
+          saveProfileToSupabase(updated, profile.id);
+        }
       }
       if (result.error) {
         setUploadError(result.error);
@@ -195,6 +199,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </button>
               )}
             </div>
+            {!profile.email && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1.5 text-center px-4 leading-tight">
+                💡 Modo local: entre com sua conta no Perfil para sincronizar sua foto entre celular e PC.
+              </p>
+            )}
             {uploadError && (
               <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1.5 font-medium text-center px-4 leading-tight">
                 {uploadError}
