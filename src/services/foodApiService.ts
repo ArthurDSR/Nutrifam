@@ -433,7 +433,8 @@ export async function estimateFoodWithAI(
   openaiApiKey?: string,
   openaiModel?: string,
   openrouterApiKey?: string,
-  openrouterModel?: string
+  openrouterModel?: string,
+  geminiModel?: string
 ): Promise<EnhancedFoodItem | null> {
   try {
     const activeKey =
@@ -443,7 +444,11 @@ export async function estimateFoodWithAI(
         ? openaiApiKey
         : geminiApiKey;
     const activeModel =
-      provider === 'openrouter' ? openrouterModel : provider === 'openai' ? openaiModel : undefined;
+      provider === 'openrouter'
+        ? openrouterModel
+        : provider === 'openai'
+        ? openaiModel
+        : (geminiModel || 'gemini-2.5-flash');
 
     const parsed = await parseQuickAddWithAI(
       description,

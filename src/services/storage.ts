@@ -41,7 +41,11 @@ export const DEFAULT_PROFILE: UserProfile = {
   equippedGlasses: null,
   equippedClothes: null,
   showSplashAnimation: true,
-  isOnboardingCompleted: false
+  isOnboardingCompleted: false,
+  aiProvider: 'openrouter',
+  openrouterModel: 'openrouter/free',
+  geminiModel: 'gemini-2.5-flash',
+  openaiModel: 'gpt-4o-mini'
 };
 
 export const DEFAULT_WEIGHT_ENTRIES: WeightEntry[] = [];
@@ -128,7 +132,13 @@ export function getStoredProfile(userId?: string): UserProfile {
         equippedClothes: parsed.equippedClothes !== undefined ? parsed.equippedClothes : null,
         petName: parsed.petName || '',
         showSplashAnimation: parsed.showSplashAnimation !== undefined ? parsed.showSplashAnimation : true,
-        isOnboardingCompleted: isCompleted
+        isOnboardingCompleted: isCompleted,
+        geminiModel: (parsed.geminiModel && parsed.geminiModel !== 'gemini-1.5-flash')
+          ? parsed.geminiModel
+          : 'gemini-2.5-flash',
+        openrouterModel: (parsed.openrouterModel && parsed.openrouterModel !== 'meta-llama/llama-3.3-70b-instruct:free' && parsed.openrouterModel !== 'google/gemini-2.0-flash-exp:free')
+          ? parsed.openrouterModel
+          : 'openrouter/free'
       };
     }
   } catch (e) {

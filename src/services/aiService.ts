@@ -278,7 +278,55 @@ function localRuleBasedParser(text: string): ParsedFoodResult {
 }
 
 /**
- * Test AI API Key connection (OpenAI or Gemini)
+ * Helper to call Gemini generateContent with automatic fallback across supported models
+ * (gemini-2.5-flash -> gemini-2.0-flash -> gemini-2.0-flash-lite)
+ */
+export async function callGeminiApi(
+  apiKey: string,
+  body: any,
+  preferredModel = 'gemini-2.5-flash'
+): Promise<Response> {
+  const modelsToTry = [
+    preferredModel,
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite'
+  ].filter((m, i, arr) => arr.indexOf(m) === i);
+
+  let lastResponse: Response | null = null;
+
+  for (const m of modelsToTry) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }
+      );
+      if (res.ok) return res;
+      lastResponse = res;
+      // If 404 (model deprecated / not found) or 400 with invalid model, continue to next fallback
+      if (res.status !== 404 && res.status !== 400) {
+        return res;
+      }
+    } catch {
+      // Continue to next model on fetch error
+    }
+  }
+
+  return (
+    lastResponse ||
+    new Response(JSON.stringify({ error: { message: 'Erro ao conectar ao Google Gemini' } }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  );
+}
+
+/**
+ * Test AI API Key connection (OpenAI, Gemini or OpenRouter)
  */
 export async function testAIConnection(
   provider: 'gemini' | 'openai' | 'openrouter',
@@ -292,7 +340,7 @@ export async function testAIConnection(
 
   try {
     if (provider === 'openrouter') {
-      const targetModel = model || 'meta-llama/llama-3.3-70b-instruct:free';
+      const targetModel = model || 'openrouter/free';
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -351,20 +399,18 @@ export async function testAIConnection(
       const errData = await response.json().catch(() => ({}));
       return { success: false, message: errData.error?.message || `Erro da OpenAI: status ${response.status}` };
     } else {
-      // Google Gemini
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`,
+      // Google Gemini with automatic modern model fallback
+      const targetModel = model || 'gemini-2.5-flash';
+      const response = await callGeminiApi(
+        cleanKey,
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: 'Ping' }] }]
-          })
-        }
+          contents: [{ parts: [{ text: 'Ping' }] }]
+        },
+        targetModel
       );
 
       if (response.ok) {
-        return { success: true, message: 'Conexão com Google Gemini (gemini-1.5-flash) validada com sucesso!' };
+        return { success: true, message: `Conexão com Google Gemini (${targetModel}) validada com sucesso!` };
       }
 
       if (response.status === 400 || response.status === 403) {
@@ -416,7 +462,7 @@ Retorne ESTRITAMENTE um objeto JSON válido (sem tags markdown nem explicações
 }`;
 
     if (provider === 'openrouter') {
-      const targetModel = model || 'meta-llama/llama-3.3-70b-instruct:free';
+      const targetModel = model || 'openrouter/free';
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -512,17 +558,15 @@ Retorne ESTRITAMENTE um objeto JSON válido (sem tags markdown nem explicações
         confidenceMessage: parsed.confidenceMessage || `Analisado com sucesso via OpenAI (${model || 'gpt-4o-mini'}).`
       };
     } else {
-      // Gemini
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`,
+      // Gemini with modern model and fallback
+      const targetModel = model || 'gemini-2.5-flash';
+      const response = await callGeminiApi(
+        cleanKey,
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' }
-          })
-        }
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' }
+        },
+        targetModel
       );
 
       if (!response.ok) {
@@ -548,7 +592,7 @@ Retorne ESTRITAMENTE um objeto JSON válido (sem tags markdown nem explicações
         totalCarbs,
         totalFat,
         totalFiber,
-        confidenceMessage: parsed.confidenceMessage || 'Refeição decomposta e analisada com Google Gemini IA.'
+        confidenceMessage: parsed.confidenceMessage || `Refeição decomposta e analisada com Google Gemini (${targetModel}).`
       };
     }
   } catch (err) {
@@ -592,7 +636,7 @@ Retorne ESTRITAMENTE um JSON no formato:
 
       if (provider === 'openrouter') {
         const cleanBase64 = imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
-        const targetModel = model || 'google/gemini-2.0-flash-exp:free';
+        const targetModel = model || 'openrouter/free';
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -707,30 +751,28 @@ Retorne ESTRITAMENTE um JSON no formato:
           }
         }
       } else {
-        // Gemini Vision
+        // Gemini Vision with modern model fallback
+        const targetModel = model || 'gemini-2.5-flash';
         const rawBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`,
+        const response = await callGeminiApi(
+          cleanKey,
           {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: prompt },
-                    {
-                      inlineData: {
-                        mimeType: mimeType,
-                        data: rawBase64
-                      }
+            contents: [
+              {
+                parts: [
+                  { text: prompt },
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: rawBase64
                     }
-                  ]
-                }
-              ],
-              generationConfig: { responseMimeType: 'application/json' }
-            })
-          }
+                  }
+                ]
+              }
+            ],
+            generationConfig: { responseMimeType: 'application/json' }
+          },
+          targetModel
         );
 
         if (response.ok) {
@@ -890,4 +932,116 @@ export function generateCoachAdvice(todayLog: DayLog, profile: UserProfile): {
     fastingAdvice,
     recommendations
   };
+}
+
+/**
+ * Interactive Coach chat with configured AI Provider (Gemini, OpenRouter or OpenAI)
+ * Falls back gracefully to heuristic nutritionist responses if no key or error occurs.
+ */
+export async function askCoachAI(
+  userMessage: string,
+  profile: UserProfile,
+  todayLog: DayLog
+): Promise<string> {
+  const provider = profile.aiProvider || 'gemini';
+  const systemPrompt = `Você é um nutricionista esportivo amigável, motivador, acolhedor e científico do aplicativo NutriFam.
+O usuário se chama ${profile.name}, pesa ${profile.currentWeightKg}kg, tem meta de ${profile.goalWeightKg}kg e limite de ${profile.dailyCaloriesTarget} kcal/dia.
+Hoje ele consumiu aproximadamente ${Object.values(todayLog.meals).reduce(
+    (acc, meal) => acc + meal.items.reduce((mAcc, i) => mAcc + i.calories * i.servingsCount, 0),
+    0
+  )} kcal e bebeu ${todayLog.water.consumedLiters}L de água.
+O usuário perguntou: "${userMessage}".
+Responda em português com conselhos práticos, empáticos e diretos em 2 a 3 frases.`;
+
+  // 1. OpenRouter
+  if (provider === 'openrouter' && profile.openrouterApiKey?.trim()) {
+    try {
+      const targetModel = profile.openrouterModel || 'openrouter/free';
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${profile.openrouterApiKey.trim()}`,
+          'HTTP-Referer': 'https://nutrifam.app',
+          'X-Title': 'NutriFam'
+        },
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+          max_tokens: 300
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content;
+        if (reply?.trim()) return reply.trim();
+      }
+    } catch (e) {
+      console.warn('OpenRouter coach chat failed:', e);
+    }
+  }
+
+  // 2. OpenAI
+  if (provider === 'openai' && profile.openaiApiKey?.trim()) {
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${profile.openaiApiKey.trim()}`
+        },
+        body: JSON.stringify({
+          model: profile.openaiModel || 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+          max_tokens: 300
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content;
+        if (reply?.trim()) return reply.trim();
+      }
+    } catch (e) {
+      console.warn('OpenAI coach chat failed:', e);
+    }
+  }
+
+  // 3. Google Gemini
+  if (provider === 'gemini' && profile.geminiApiKey?.trim()) {
+    try {
+      const res = await callGeminiApi(
+        profile.geminiApiKey.trim(),
+        {
+          contents: [{ parts: [{ text: `${systemPrompt}\n\nPergunta do usuário: ${userMessage}` }] }]
+        },
+        profile.geminiModel || 'gemini-2.5-flash'
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (reply?.trim()) return reply.trim();
+      }
+    } catch (e) {
+      console.warn('Gemini coach chat failed:', e);
+    }
+  }
+
+  // 4. Contextual heuristics fallback
+  const lower = userMessage.toLowerCase();
+  if (lower.includes('jantar') || lower.includes('noite') || lower.includes('dinner')) {
+    return `Para o jantar, uma excelente opção com alta saciedade e poucas calorias é filé de peito de frango grelhado (150g) com salada farta de folhas verdes e brócolis cozido no vapor. Isso garante ~45g de proteína mantendo o déficit calórico!`;
+  }
+  if (lower.includes('proteina') || lower.includes('proteína') || lower.includes('protein')) {
+    return `Para bater seus ${profile.targetMacros.proteinGrams}g de proteína diários, inclua fontes magras como ovos mexidos, peito de frango, atum, iogurte natural desnatado ou uma dose de Whey Protein após o treino.`;
+  }
+  if (lower.includes('fome') || lower.includes('apetite') || lower.includes('doce')) {
+    return `A vontade de comer doces costuma estar ligada a sede ou queda rápida de energia. Beba 300ml de água gelada primeiro e, se persistir, aposte em chocolate 70%+ com moderação ou maçã polvilhada com canela!`;
+  }
+  return `Excelente pergunta, ${profile.name}! Para sustentar sua meta em ${profile.dailyCaloriesTarget} kcal, priorize hidratação adequada, ingestão consistente de proteínas em cada refeição e controle de porções de carboidratos refinados.`;
 }

@@ -8,6 +8,7 @@ interface PhotoScannerViewProps {
   onAddMultipleFoods: (foods: FoodItem[]) => void;
   aiProvider?: 'gemini' | 'openai' | 'openrouter';
   geminiApiKey?: string;
+  geminiModel?: string;
   openaiApiKey?: string;
   openaiModel?: string;
   openrouterApiKey?: string;
@@ -19,6 +20,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
   onAddMultipleFoods,
   aiProvider = 'openrouter',
   geminiApiKey,
+  geminiModel,
   openaiApiKey,
   openaiModel,
   openrouterApiKey,
@@ -39,7 +41,11 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
       ? openaiApiKey
       : geminiApiKey;
   const activeModel =
-    aiProvider === 'openrouter' ? openrouterModel : openaiModel;
+    aiProvider === 'openrouter'
+      ? (openrouterModel || 'openrouter/free')
+      : aiProvider === 'openai'
+      ? (openaiModel || 'gpt-4o-mini')
+      : (geminiModel || 'gemini-2.5-flash');
   const hasCustomKey = Boolean(activeApiKey && activeApiKey.trim() !== '');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,9 +106,11 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
           <Sparkles className="w-3.5 h-3.5" style={{ color: activeColor.primary }} />
           <span>
             {hasCustomKey
-              ? aiProvider === 'openai'
+              ? aiProvider === 'openrouter'
+                ? `Visão IA: OpenRouter (${openrouterModel || 'openrouter/free'})`
+                : aiProvider === 'openai'
                 ? `Visão IA: OpenAI (${openaiModel || 'gpt-4o-mini'})`
-                : 'Visão IA: Google Gemini 1.5 Flash'
+                : `Visão IA: Gemini (${geminiModel || 'gemini-2.5-flash'})`
               : 'Modo Local (Simulação de Prato Equilibrado)'}
           </span>
         </div>

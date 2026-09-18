@@ -17,7 +17,8 @@ interface SettingsModalProps {
     openaiKey: string,
     openaiModel: string,
     openrouterKey?: string,
-    openrouterModel?: string
+    openrouterModel?: string,
+    geminiModel?: string
   ) => void;
   onOpenAuth?: () => void;
   onLogout?: () => void;
@@ -26,6 +27,15 @@ interface SettingsModalProps {
   onSyncHealth?: () => void;
   onRedoOnboarding?: () => void;
 }
+
+const OPENROUTER_PRESETS = [
+  { id: 'openrouter/free', label: 'openrouter/free (Roteador Automático - 100% Grátis Oficial)' },
+  { id: 'deepseek/deepseek-v4-flash-0731:free', label: 'deepseek/deepseek-v4-flash-0731:free (Rápido e 100% Grátis)' },
+  { id: 'qwen/qwen3.8-27b:free', label: 'qwen/qwen3.8-27b:free (Nutrição & Raciocínio Grátis)' },
+  { id: 'google/gemma-4-31b-it:free', label: 'google/gemma-4-31b-it:free (Google Gemma 4 31B Grátis)' },
+  { id: 'inclusionai/ling-3.0-flash-vl:free', label: 'inclusionai/ling-3.0-flash-vl:free (Visão & Fotos de Pratos Grátis)' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'nvidia/nemotron-3-super-120b-a12b:free (NVIDIA 120B Grátis)' },
+];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   profile,
@@ -42,10 +52,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const { t, language, setLanguage } = useTranslation();
   const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'openrouter'>(profile.aiProvider || 'openrouter');
   const [geminiKey, setGeminiKey] = useState(profile.geminiApiKey || '');
+  const [geminiModel, setGeminiModel] = useState(profile.geminiModel || 'gemini-2.5-flash');
   const [openaiKey, setOpenaiKey] = useState(profile.openaiApiKey || '');
   const [openaiModel, setOpenaiModel] = useState(profile.openaiModel || 'gpt-4o-mini');
   const [openrouterKey, setOpenrouterKey] = useState(profile.openrouterApiKey || '');
-  const [openrouterModel, setOpenrouterModel] = useState(profile.openrouterModel || 'meta-llama/llama-3.3-70b-instruct:free');
+  const [openrouterModel, setOpenrouterModel] = useState(profile.openrouterModel || 'openrouter/free');
+  const [isCustomOpenrouter, setIsCustomOpenrouter] = useState(
+    Boolean(profile.openrouterModel && !OPENROUTER_PRESETS.some((p) => p.id === profile.openrouterModel))
+  );
   const [showKey, setShowKey] = useState(false);
   const [isTestingAI, setIsTestingAI] = useState(false);
   const [aiTestStatus, setAiTestStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -62,7 +76,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleTestAI = async () => {
     let activeKey = geminiKey;
-    let activeModel = openaiModel;
+    let activeModel = geminiModel;
     if (aiProvider === 'openrouter') {
       activeKey = openrouterKey;
       activeModel = openrouterModel;
@@ -89,7 +103,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       openaiKey.trim(),
       openaiModel,
       openrouterKey.trim(),
-      openrouterModel
+      openrouterModel.trim(),
+      geminiModel
     );
     if (onSaveApiKey) {
       onSaveApiKey(geminiKey.trim());
@@ -548,27 +563,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#3F4B46] dark:text-[#EDF2EF] block mb-1 text-[11px]">
-                    {t('ai.modelOpenRouter')}
-                  </label>
-                  <select
-                    value={openrouterModel}
-                    onChange={(e) => setOpenrouterModel(e.target.value)}
-                    className="w-full p-2 rounded-xl border border-[#AEBDB5]/40 dark:border-[#394842] focus:outline-none text-[11px] bg-white dark:bg-[#232D29] font-medium text-[#3F4B46] dark:text-[#EDF2EF]"
-                  >
-                    <option value="meta-llama/llama-3.3-70b-instruct:free">
-                      meta-llama/llama-3.3-70b-instruct:free (Recomendado - 70B Inteligente)
-                    </option>
-                    <option value="google/gemini-2.0-flash-exp:free">
-                      google/gemini-2.0-flash-exp:free (Rápido + Foto/Visão Grátis)
-                    </option>
-                    <option value="deepseek/deepseek-r1:free">
-                      deepseek/deepseek-r1:free (Raciocínio Lógico Profundo)
-                    </option>
-                    <option value="qwen/qwen-2.5-72b-instruct:free">
-                      qwen/qwen-2.5-72b-instruct:free (Qwen 72B Grátis)
-                    </option>
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-[#3F4B46] dark:text-[#EDF2EF] text-[11px]">
+                      {t('ai.modelOpenRouter')}
+                    </label>
+                    {isCustomOpenrouter ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomOpenrouter(false);
+                          setOpenrouterModel('openrouter/free');
+                        }}
+                        className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline font-semibold"
+                      >
+                        Ver modelos sugeridos
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {!isCustomOpenrouter ? (
+                    <select
+                      value={openrouterModel}
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setIsCustomOpenrouter(true);
+                        } else {
+                          setOpenrouterModel(e.target.value);
+                        }
+                      }}
+                      className="w-full p-2 rounded-xl border border-[#AEBDB5]/40 dark:border-[#394842] focus:outline-none text-[11px] bg-white dark:bg-[#232D29] font-medium text-[#3F4B46] dark:text-[#EDF2EF]"
+                    >
+                      {OPENROUTER_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </option>
+                      ))}
+                      <option value="__custom__">
+                        Outro modelo personalizado...
+                      </option>
+                    </select>
+                  ) : (
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        value={openrouterModel}
+                        onChange={(e) => setOpenrouterModel(e.target.value)}
+                        placeholder={t('ai.customModelPlaceholder')}
+                        className="w-full p-2 rounded-xl border border-[#AEBDB5]/40 dark:border-[#394842] focus:outline-none text-[11px] font-mono bg-white dark:bg-[#232D29] text-[#3F4B46] dark:text-[#EDF2EF]"
+                      />
+                      <p className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1]">
+                        Dica: use qualquer slug oficial do catálogo OpenRouter (ex: deepseek/deepseek-chat ou openrouter/free).
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : aiProvider === 'openai' ? (
@@ -652,6 +699,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-[#3F4B46] dark:text-[#EDF2EF] block mb-1 text-[11px]">
+                    {t('ai.modelGemini')}
+                  </label>
+                  <select
+                    value={geminiModel}
+                    onChange={(e) => setGeminiModel(e.target.value)}
+                    className="w-full p-2 rounded-xl border border-[#AEBDB5]/40 dark:border-[#394842] focus:outline-none text-[11px] bg-white dark:bg-[#232D29] font-medium text-[#3F4B46] dark:text-[#EDF2EF]"
+                  >
+                    <option value="gemini-2.5-flash">
+                      gemini-2.5-flash (Recomendado - Mais recente, rápido e gratuito)
+                    </option>
+                    <option value="gemini-2.0-flash">
+                      gemini-2.0-flash (Nova geração 2.0 com visão de fotos)
+                    </option>
+                    <option value="gemini-2.0-flash-lite">
+                      gemini-2.0-flash-lite (Ultra leve com menor latência)
+                    </option>
+                  </select>
                   <p className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] mt-1">
                     {t('ai.geminiModelNotice')}
                   </p>

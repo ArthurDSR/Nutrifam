@@ -1039,6 +1039,7 @@ export const App: React.FC = () => {
           }}
           aiProvider={profile.aiProvider}
           geminiApiKey={profile.geminiApiKey}
+          geminiModel={profile.geminiModel}
           openaiApiKey={profile.openaiApiKey}
           openaiModel={profile.openaiModel}
           openrouterApiKey={profile.openrouterApiKey}
@@ -1114,11 +1115,12 @@ export const App: React.FC = () => {
         <SettingsModal
           profile={profile}
           onClose={() => setIsSettingsOpen(false)}
-          onSaveAISettings={(provider, geminiKey, openaiKey, openaiModel, openrouterKey, openrouterModel) => {
+          onSaveAISettings={(provider, geminiKey, openaiKey, openaiModel, openrouterKey, openrouterModel, geminiModel) => {
             setProfile((p) => ({
               ...p,
               aiProvider: provider,
               geminiApiKey: geminiKey,
+              geminiModel: geminiModel,
               openaiApiKey: openaiKey,
               openaiModel: openaiModel,
               openrouterApiKey: openrouterKey,

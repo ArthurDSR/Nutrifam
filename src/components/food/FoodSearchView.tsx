@@ -20,6 +20,7 @@ interface FoodSearchViewProps {
   onSelectProductForDetails?: (food: FoodItem) => void;
   aiProvider?: 'gemini' | 'openai' | 'openrouter';
   geminiApiKey?: string;
+  geminiModel?: string;
   openaiApiKey?: string;
   openaiModel?: string;
   openrouterApiKey?: string;
@@ -41,6 +42,7 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
   onSelectProductForDetails,
   aiProvider = 'openrouter',
   geminiApiKey,
+  geminiModel,
   openaiApiKey,
   openaiModel,
   openrouterApiKey,
@@ -155,7 +157,8 @@ export const FoodSearchView: React.FC<FoodSearchViewProps> = ({
         openaiApiKey,
         openaiModel,
         openrouterApiKey,
-        openrouterModel
+        openrouterModel,
+        geminiModel
       );
 
       if (estimated) {

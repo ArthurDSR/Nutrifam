@@ -73,10 +73,11 @@ export interface UserProfile {
   appleHealthSynced: boolean;
   aiProvider?: 'gemini' | 'openai' | 'openrouter';
   geminiApiKey?: string;
+  geminiModel?: string; // 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-2.0-flash-lite'
   openaiApiKey?: string;
   openaiModel?: string; // 'gpt-4o-mini' | 'gpt-4o'
   openrouterApiKey?: string;
-  openrouterModel?: string; // e.g. 'meta-llama/llama-3.3-70b-instruct:free'
+  openrouterModel?: string; // e.g. 'openrouter/free'
   age?: number;
   gender?: 'male' | 'female';
   activityLevel?: 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high';

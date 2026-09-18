@@ -206,7 +206,10 @@ const translations = {
     'ai.createKeyFree': 'Criar chave grátis →',
     'ai.createKeyOpenAi': 'Criar chave na OpenAI →',
     'ai.createKeyGemini': 'Obter chave gratuita no Google AI Studio →',
-    'ai.geminiModelNotice': 'Modelo: gemini-1.5-flash (Visão multimodal e respostas instantâneas)',
+    'ai.geminiModelNotice': 'Modelos ativos: gemini-2.5-flash / gemini-2.0-flash (Visão multimodal e respostas instantâneas)',
+    'ai.modelGemini': 'Modelo Google Gemini',
+    'ai.customModelLabel': 'Slug do Modelo Personalizado',
+    'ai.customModelPlaceholder': 'Ex: deepseek/deepseek-v4-flash-0731:free',
     'ai.testKeyWith': 'Testar Chave',
 
     // Pet Naming & Wardrobe
@@ -427,7 +430,10 @@ const translations = {
     'ai.createKeyFree': 'Create free key →',
     'ai.createKeyOpenAi': 'Create key on OpenAI →',
     'ai.createKeyGemini': 'Get free key at Google AI Studio →',
-    'ai.geminiModelNotice': 'Model: gemini-1.5-flash (Multimodal vision and instant responses)',
+    'ai.geminiModelNotice': 'Active models: gemini-2.5-flash / gemini-2.0-flash (Multimodal vision and instant responses)',
+    'ai.modelGemini': 'Google Gemini Model',
+    'ai.customModelLabel': 'Custom Model Slug',
+    'ai.customModelPlaceholder': 'E.g., deepseek/deepseek-v4-flash-0731:free',
     'ai.testKeyWith': 'Test Key',
 
     // Pet Naming & Wardrobe
@@ -648,7 +654,10 @@ const translations = {
     'ai.createKeyFree': 'Crear clave gratis →',
     'ai.createKeyOpenAi': 'Crear clave en OpenAI →',
     'ai.createKeyGemini': 'Obtener clave gratis en Google AI Studio →',
-    'ai.geminiModelNotice': 'Modelo: gemini-1.5-flash (Visión multimodal y respuestas instantáneas)',
+    'ai.geminiModelNotice': 'Modelos activos: gemini-2.5-flash / gemini-2.0-flash (Visión multimodal y respuestas instantáneas)',
+    'ai.modelGemini': 'Modelo Google Gemini',
+    'ai.customModelLabel': 'Slug del Modelo Personalizado',
+    'ai.customModelPlaceholder': 'Ej: deepseek/deepseek-v4-flash-0731:free',
     'ai.testKeyWith': 'Probar Clave',
 
     // Pet Naming & Wardrobe

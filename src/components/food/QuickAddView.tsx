@@ -8,6 +8,7 @@ interface QuickAddViewProps {
   onAddMultipleFoods: (foods: FoodItem[]) => void;
   aiProvider?: 'gemini' | 'openai' | 'openrouter';
   geminiApiKey?: string;
+  geminiModel?: string;
   openaiApiKey?: string;
   openaiModel?: string;
   openrouterApiKey?: string;
@@ -19,6 +20,7 @@ export const QuickAddView: React.FC<QuickAddViewProps> = ({
   onAddMultipleFoods,
   aiProvider = 'openrouter',
   geminiApiKey,
+  geminiModel,
   openaiApiKey,
   openaiModel,
   openrouterApiKey,
@@ -39,7 +41,11 @@ export const QuickAddView: React.FC<QuickAddViewProps> = ({
       ? openaiApiKey
       : geminiApiKey;
   const activeModel =
-    aiProvider === 'openrouter' ? openrouterModel : openaiModel;
+    aiProvider === 'openrouter'
+      ? (openrouterModel || 'openrouter/free')
+      : aiProvider === 'openai'
+      ? (openaiModel || 'gpt-4o-mini')
+      : (geminiModel || 'gemini-2.5-flash');
   const hasCustomKey = Boolean(activeApiKey && activeApiKey.trim() !== '');
 
   const sampleChips = [
@@ -132,9 +138,11 @@ export const QuickAddView: React.FC<QuickAddViewProps> = ({
           <Sparkles className="w-3.5 h-3.5" style={{ color: activeColor.primary }} />
           <span>
             {hasCustomKey
-              ? aiProvider === 'openai'
+              ? aiProvider === 'openrouter'
+                ? `IA Ativa: OpenRouter (${openrouterModel || 'openrouter/free'})`
+                : aiProvider === 'openai'
                 ? `IA Ativa: OpenAI (${openaiModel || 'gpt-4o-mini'})`
-                : 'IA Ativa: Google Gemini'
+                : `IA Ativa: Gemini (${geminiModel || 'gemini-2.5-flash'})`
               : 'Modo Local (Estimativa Rápida)'}
           </span>
         </div>

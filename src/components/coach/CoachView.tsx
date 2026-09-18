@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Bot, User, Droplets, Flame, Scale } from 'lucide-react';
 import { UserProfile, DayLog } from '../../types';
-import { generateCoachAdvice } from '../../services/aiService';
+import { generateCoachAdvice, askCoachAI } from '../../services/aiService';
 import { useTheme } from '../../services/themeService';
 
 interface CoachViewProps {
@@ -24,7 +24,10 @@ export const CoachView: React.FC<CoachViewProps> = ({
   onOpenScientificAssessment
 }) => {
   const { isDark, activeColor } = useTheme();
-  const advice = generateCoachAdvice(todayLog, profile);
+  const effectiveProfile = geminiApiKey
+    ? { ...profile, geminiApiKey: profile.geminiApiKey || geminiApiKey }
+    : profile;
+  const advice = generateCoachAdvice(todayLog, effectiveProfile);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [inputMessage, setInputMessage] = useState('');
@@ -57,45 +60,17 @@ export const CoachView: React.FC<CoachViewProps> = ({
     setMessages((prev) => [...prev, newMsg]);
     setIsTyping(true);
 
-    // Call Gemini API if available, or generate contextual nutrition response
+    // Call configured AI Provider (Gemini 2.5, OpenRouter Free, or OpenAI)
     setTimeout(async () => {
       let reply = '';
-      if (geminiApiKey && geminiApiKey.trim()) {
-        try {
-          const prompt = `Você é um nutricionista esportivo amigável, motivador e científico.
-O usuário se chama ${profile.name}, pesa ${profile.currentWeightKg}kg, tem meta de ${profile.goalWeightKg}kg e limite de ${profile.dailyCaloriesTarget} kcal/dia.
-Ele pergunta: "${userText}".
-Responda de forma concisa, objetiva e prática em 2 a 3 frases.`;
-
-          const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-              })
-            }
-          );
-          if (res.ok) {
-            const data = await res.json();
-            reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          }
-        } catch {}
+      try {
+        reply = await askCoachAI(userText, effectiveProfile, todayLog);
+      } catch (err) {
+        console.warn('Coach AI error:', err);
       }
 
       if (!reply) {
-        // High quality heuristic responses
-        const lower = userText.toLowerCase();
-        if (lower.includes('jantar') || lower.includes('noite') || lower.includes('dinner')) {
-          reply = `Para o jantar, uma excelente opção com alta saciedade e poucas calorias é filé de peito de frango grelhado (150g) com salada farta de folhas verdes e brócolis cozido no vapor. Isso garante ~45g de proteína mantendo o déficit calórico!`;
-        } else if (lower.includes('proteina') || lower.includes('proteína') || lower.includes('protein')) {
-          reply = `Para bater seus ${profile.targetMacros.proteinGrams}g de proteína diários, inclua fontes magras como ovos mexidos, peito de frango, atum, iogurte natural desnatado ou uma dose de Whey Protein após o treino.`;
-        } else if (lower.includes('fome') || lower.includes('apetite') || lower.includes('doce')) {
-          reply = `A vontade de comer doces costuma estar ligada a sede ou queda rápida de energia. Beba 300ml de água gelada primeiro e, se persistir, aposte em chocolate 70%+ com moderação ou maçã polvilhada com canela!`;
-        } else {
-          reply = `Excelente pergunta, ${profile.name}! Para sustentar sua meta em ${profile.dailyCaloriesTarget} kcal, priorize hidratação adequada, ingestão consistente de proteínas em cada refeição e controle de porções de carboidratos refinados.`;
-        }
+        reply = `Excelente pergunta, ${profile.name}! Para sustentar sua meta em ${profile.dailyCaloriesTarget} kcal, priorize hidratação adequada e ingestão consistente de proteínas em cada refeição.`;
       }
 
       setMessages((prev) => [
@@ -107,7 +82,7 @@ Responda de forma concisa, objetiva e prática em 2 a 3 frases.`;
         }
       ]);
       setIsTyping(false);
-    }, 800);
+    }, 400);
   };
 
   return (

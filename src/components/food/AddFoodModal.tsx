@@ -23,6 +23,7 @@ interface AddFoodModalProps {
   onOpenMealReview?: () => void;
   aiProvider?: 'gemini' | 'openai' | 'openrouter';
   geminiApiKey?: string;
+  geminiModel?: string;
   openaiApiKey?: string;
   openaiModel?: string;
   openrouterApiKey?: string;
@@ -42,6 +43,7 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
   onOpenMealReview,
   aiProvider = 'openrouter',
   geminiApiKey,
+  geminiModel,
   openaiApiKey,
   openaiModel,
   openrouterApiKey,
@@ -306,6 +308,7 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
             onSelectProductForDetails={handleSelectFoodItem}
             aiProvider={aiProvider}
             geminiApiKey={geminiApiKey}
+            geminiModel={geminiModel}
             openaiApiKey={openaiApiKey}
             openaiModel={openaiModel}
             openrouterApiKey={openrouterApiKey}
@@ -324,6 +327,7 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
             onAddMultipleFoods={(foods) => onAddMultipleFoodsToMeal(meal.type, foods)}
             aiProvider={aiProvider}
             geminiApiKey={geminiApiKey}
+            geminiModel={geminiModel}
             openaiApiKey={openaiApiKey}
             openaiModel={openaiModel}
             openrouterApiKey={openrouterApiKey}
@@ -337,6 +341,7 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
             onAddMultipleFoods={(foods) => onAddMultipleFoodsToMeal(meal.type, foods)}
             aiProvider={aiProvider}
             geminiApiKey={geminiApiKey}
+            geminiModel={geminiModel}
             openaiApiKey={openaiApiKey}
             openaiModel={openaiModel}
             openrouterApiKey={openrouterApiKey}
