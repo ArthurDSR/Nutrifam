@@ -204,7 +204,7 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
       exercises: prev.exercises.map((ex, idx) => {
         if (idx === exerciseIndex) {
           const current = ex.restSeconds || 60;
-          const next = isAbsolute ? deltaOrVal : Math.max(15, Math.min(600, current + deltaOrVal));
+          const next = isAbsolute ? deltaOrVal : Math.max(15, Math.min(300, current + deltaOrVal));
           return { ...ex, restSeconds: next };
         }
         return ex;
@@ -388,13 +388,32 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
                     <h3 className="text-xs sm:text-sm font-black text-[#0080FF] dark:text-blue-400 truncate">
                       {exercise.exerciseName}
                     </h3>
-                    <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="flex items-center gap-1.5 mt-1">
                       <Timer className="w-3.5 h-3.5 text-[#0080FF] shrink-0" />
                       <span className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">Descanso:</span>
-                      <span className="text-xs font-black font-mono text-[#0080FF]">
-                        {formatMinutesSeconds(exercise.restSeconds || 60)}
-                      </span>
-                      <div className="flex items-center gap-1 ml-1.5">
+                      <select
+                        value={exercise.restSeconds || 60}
+                        onChange={(e) =>
+                          handleAdjustExerciseRest(exIdx, parseInt(e.target.value) || 60, true)
+                        }
+                        className="bg-blue-50 dark:bg-blue-950/40 text-[#0080FF] border border-blue-200 dark:border-blue-900/50 rounded-lg px-1 py-0.5 text-xs font-black font-mono focus:outline-none cursor-pointer"
+                        title={`Tempo de descanso atual: ${formatMinutesSeconds(exercise.restSeconds || 60)} (até 5 min)`}
+                      >
+                        <option value={30}>00:30</option>
+                        <option value={45}>00:45</option>
+                        <option value={60}>01:00</option>
+                        <option value={75}>01:15</option>
+                        <option value={90}>01:30</option>
+                        <option value={105}>01:45</option>
+                        <option value={120}>02:00</option>
+                        <option value={150}>02:30</option>
+                        <option value={180}>03:00</option>
+                        <option value={210}>03:30</option>
+                        <option value={240}>04:00</option>
+                        <option value={270}>04:30</option>
+                        <option value={300}>05:00</option>
+                      </select>
+                      <div className="flex items-center gap-1 ml-1">
                         <button
                           type="button"
                           onClick={() => handleAdjustExerciseRest(exIdx, -15)}

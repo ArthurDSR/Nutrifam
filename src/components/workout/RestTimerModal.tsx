@@ -90,7 +90,7 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
 
   const handleAdjustTime = (deltaSeconds: number) => {
     setTimeLeft((prev) => {
-      const next = Math.max(0, prev + deltaSeconds);
+      const next = Math.max(0, Math.min(300, prev + deltaSeconds));
       if (next > totalTime) setTotalTime(next);
       return next;
     });
@@ -194,7 +194,7 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
         </div>
 
         {/* Quick Add/Subtract Controls */}
-        <div className="flex items-center gap-3 my-4">
+        <div className="flex items-center gap-3 my-3">
           <button
             onClick={() => handleAdjustTime(-15)}
             className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-[#2B3732] text-xs font-bold text-[#3F4B46] dark:text-[#EDF2EF] hover:opacity-80 active:scale-95 transition-transform flex items-center gap-1"
@@ -214,6 +214,27 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
           >
             <Plus className="w-3 h-3" /> 30s
           </button>
+        </div>
+
+        {/* Quick Presets up to 5 min */}
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 mb-3 touch-pan-x">
+          {[30, 60, 90, 120, 150, 180, 240, 300].map((sec) => (
+            <button
+              key={sec}
+              onClick={() => {
+                setTotalTime(sec);
+                setTimeLeft(sec);
+                setIsRunning(true);
+              }}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold font-mono shrink-0 transition-colors ${
+                timeLeft === sec
+                  ? 'bg-emerald-500 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-[#2B3732] text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              {Math.floor(sec / 60)}:{(sec % 60).toString().padStart(2, '0')}
+            </button>
+          ))}
         </div>
 
         {/* Action Button */}

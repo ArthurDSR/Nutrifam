@@ -290,22 +290,32 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-[#6F7C76] dark:text-[#A8B8B1] block">
-                          Descanso (s)
+                        <label className="text-[10px] font-semibold text-[#6F7C76] dark:text-[#A8B8B1] block truncate">
+                          Descanso ({Math.floor((item.restSeconds || 60) / 60).toString().padStart(2, '0')}:{((item.restSeconds || 60) % 60).toString().padStart(2, '0')})
                         </label>
-                        <input
-                          type="number"
-                          step="15"
-                          min="15"
-                          max="300"
-                          value={item.restSeconds}
+                        <select
+                          value={item.restSeconds || 60}
                           onChange={(e) =>
                             handleUpdateExercise(idx, {
                               restSeconds: parseInt(e.target.value) || 60
                             })
                           }
                           className="w-full mt-0.5 px-2 py-1 bg-white dark:bg-[#1E2623] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-lg text-xs font-bold text-center"
-                        />
+                        >
+                          <option value={30}>00:30 (30s)</option>
+                          <option value={45}>00:45 (45s)</option>
+                          <option value={60}>01:00 (1 min)</option>
+                          <option value={75}>01:15 (1m15s)</option>
+                          <option value={90}>01:30 (1m30s)</option>
+                          <option value={105}>01:45 (1m45s)</option>
+                          <option value={120}>02:00 (2 min)</option>
+                          <option value={150}>02:30 (2m30s)</option>
+                          <option value={180}>03:00 (3 min)</option>
+                          <option value={210}>03:30 (3m30s)</option>
+                          <option value={240}>04:00 (4 min)</option>
+                          <option value={270}>04:30 (4m30s)</option>
+                          <option value={300}>05:00 (5 min)</option>
+                        </select>
                       </div>
                     </div>
                   </div>

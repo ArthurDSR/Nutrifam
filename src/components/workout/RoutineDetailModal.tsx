@@ -68,7 +68,7 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
     const updatedExercises = [...currentRoutine.exercises];
     const targetEx = { ...updatedExercises[exIndex] };
     const currentRest = targetEx.restSeconds || 90;
-    const newRest = isAbsolute ? deltaOrValue : Math.max(15, Math.min(600, currentRest + deltaOrValue));
+    const newRest = isAbsolute ? deltaOrValue : Math.max(15, Math.min(300, currentRest + deltaOrValue));
 
     targetEx.restSeconds = newRest;
     updatedExercises[exIndex] = targetEx;
@@ -215,14 +215,14 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-xs">
-                      {[60, 90, 120, 180].map((sec) => (
+                    <div className="flex items-center gap-1.5 text-xs overflow-x-auto max-w-[200px] sm:max-w-xs py-0.5 touch-pan-x">
+                      {[30, 45, 60, 90, 120, 150, 180, 240, 300].map((sec) => (
                         <button
                           key={sec}
                           onClick={() => handleUpdateRestSeconds(exIndex, sec, true)}
-                          className={`px-2 py-1 rounded-lg text-[11px] font-bold font-mono transition-colors ${
+                          className={`px-2 py-1 rounded-lg text-[11px] font-bold font-mono transition-colors shrink-0 ${
                             restSeconds === sec
-                              ? 'bg-[#0080FF] text-white'
+                              ? 'bg-[#0080FF] text-white shadow-xs'
                               : 'bg-white dark:bg-[#1E2623] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#394842]'
                           }`}
                         >
