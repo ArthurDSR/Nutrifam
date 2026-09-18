@@ -204,7 +204,7 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
       exercises: prev.exercises.map((ex, idx) => {
         if (idx === exerciseIndex) {
           const current = ex.restSeconds || 60;
-          const next = isAbsolute ? deltaOrVal : Math.max(15, Math.min(300, current + deltaOrVal));
+          const next = isAbsolute ? deltaOrVal : Math.max(15, Math.min(900, current + deltaOrVal));
           return { ...ex, restSeconds: next };
         }
         return ex;
@@ -412,6 +412,11 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
                         <option value={240}>04:00</option>
                         <option value={270}>04:30</option>
                         <option value={300}>05:00</option>
+                        {exercise.restSeconds && exercise.restSeconds > 300 && (
+                          <option value={exercise.restSeconds}>
+                            {formatMinutesSeconds(exercise.restSeconds)} (Personalizado)
+                          </option>
+                        )}
                       </select>
                       <div className="flex items-center gap-1 ml-1">
                         <button

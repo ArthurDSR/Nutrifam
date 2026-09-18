@@ -68,7 +68,7 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
     const updatedExercises = [...currentRoutine.exercises];
     const targetEx = { ...updatedExercises[exIndex] };
     const currentRest = targetEx.restSeconds || 90;
-    const newRest = isAbsolute ? deltaOrValue : Math.max(15, Math.min(300, currentRest + deltaOrValue));
+    const newRest = isAbsolute ? deltaOrValue : Math.max(15, Math.min(900, currentRest + deltaOrValue));
 
     targetEx.restSeconds = newRest;
     updatedExercises[exIndex] = targetEx;
@@ -229,6 +229,11 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
                           {formatMinutesSeconds(sec)}
                         </button>
                       ))}
+                      {restSeconds > 300 && (
+                        <span className="px-2 py-1 rounded-lg text-[11px] font-bold font-mono bg-[#0080FF] text-white shadow-xs shrink-0">
+                          {formatMinutesSeconds(restSeconds)}
+                        </span>
+                      )}
                     </div>
 
                     <button

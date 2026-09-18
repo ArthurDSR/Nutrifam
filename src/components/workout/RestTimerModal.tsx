@@ -90,7 +90,7 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
 
   const handleAdjustTime = (deltaSeconds: number) => {
     setTimeLeft((prev) => {
-      const next = Math.max(0, Math.min(300, prev + deltaSeconds));
+      const next = Math.max(0, Math.min(900, prev + deltaSeconds));
       if (next > totalTime) setTotalTime(next);
       return next;
     });
@@ -235,6 +235,11 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
               {Math.floor(sec / 60)}:{(sec % 60).toString().padStart(2, '0')}
             </button>
           ))}
+          {timeLeft > 300 && (
+            <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold font-mono shrink-0 bg-emerald-500 text-white shadow-xs">
+              {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </span>
+          )}
         </div>
 
         {/* Action Button */}

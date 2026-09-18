@@ -295,11 +295,22 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                         </label>
                         <select
                           value={item.restSeconds || 60}
-                          onChange={(e) =>
-                            handleUpdateExercise(idx, {
-                              restSeconds: parseInt(e.target.value) || 60
-                            })
-                          }
+                          onChange={(e) => {
+                            if (e.target.value === 'custom') {
+                              const input = prompt('Digite o tempo de descanso em minutos (ex: 6 ou 7.5) ou segundos (ex: 360):');
+                              if (input) {
+                                const val = parseFloat(input.replace(',', '.'));
+                                if (!isNaN(val) && val > 0) {
+                                  const totalSec = val <= 20 ? Math.round(val * 60) : Math.round(val);
+                                  handleUpdateExercise(idx, { restSeconds: totalSec });
+                                }
+                              }
+                            } else {
+                              handleUpdateExercise(idx, {
+                                restSeconds: parseInt(e.target.value) || 60
+                              });
+                            }
+                          }}
                           className="w-full mt-0.5 px-2 py-1 bg-white dark:bg-[#1E2623] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-lg text-xs font-bold text-center"
                         >
                           <option value={30}>00:30 (30s)</option>
@@ -315,6 +326,12 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                           <option value={240}>04:00 (4 min)</option>
                           <option value={270}>04:30 (4m30s)</option>
                           <option value={300}>05:00 (5 min)</option>
+                          {item.restSeconds && item.restSeconds > 300 && (
+                            <option value={item.restSeconds}>
+                              {Math.floor(item.restSeconds / 60).toString().padStart(2, '0')}:{((item.restSeconds) % 60).toString().padStart(2, '0')} (Personalizado)
+                            </option>
+                          )}
+                          <option value="custom">+ Digitar outro tempo...</option>
                         </select>
                       </div>
                     </div>
