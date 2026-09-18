@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useTheme } from '../../services/themeService';
+import { initializeNativeApp } from '../../services/nativeService';
 
 interface MobileFrameProps {
   children: React.ReactNode;
@@ -8,13 +9,14 @@ interface MobileFrameProps {
 export const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
   const { isDark } = useTheme();
 
-  // Sync dark class on document root as well for system modals & browser controls
+  // Sync dark class on document root and update native mobile status bar
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
+    initializeNativeApp(isDark);
   }, [isDark]);
 
   return (

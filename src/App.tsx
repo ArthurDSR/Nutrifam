@@ -27,6 +27,7 @@ import { SplashScreen } from './components/splash/SplashScreen';
 import { OnboardingSurvey } from './components/onboarding/OnboardingSurvey';
 import { NativeHealthNoticeModal } from './components/health/NativeHealthNoticeModal';
 import { syncHealthData, isCapacitorNative } from './services/healthSyncService';
+import { setupAndroidBackButton } from './services/nativeService';
 import { getLocalAuthUser, setLocalAuthUser, logoutAccount, AuthUser } from './services/authService';
 import { calculateFastingWindow } from './services/fastingScheduler';
 import { syncDayLogMealTargets } from './services/nutritionCalculator';
@@ -729,6 +730,36 @@ export const App: React.FC = () => {
       handleSyncHealth(true);
     }
   }, [profile.appleHealthSynced, selectedDate]);
+
+  // Android native hardware back button handler (closes active modal or returns to journal)
+  useEffect(() => {
+    return setupAndroidBackButton(() => {
+      if (isSettingsOpen) { setIsSettingsOpen(false); return true; }
+      if (isAddWeightOpen) { setIsAddWeightOpen(false); return true; }
+      if (isEditProfileOpen) { setIsEditProfileOpen(false); return true; }
+      if (isScientificAssessmentOpen) { setIsScientificAssessmentOpen(false); return true; }
+      if (isAuthModalOpen) { setIsAuthModalOpen(false); return true; }
+      if (isTwoFactorModalOpen) { setIsTwoFactorModalOpen(false); return true; }
+      if (isNativeHealthNoticeOpen) { setIsNativeHealthNoticeOpen(false); return true; }
+      if (isFastingDetailOpen) { setIsFastingDetailOpen(false); return true; }
+      if (activeMealForReview) { setActiveMealForReview(null); return true; }
+      if (activeMealForAdd) { setActiveMealForAdd(null); return true; }
+      if (activeTab !== 'journal') { setActiveTab('journal'); return true; }
+      return false;
+    });
+  }, [
+    isSettingsOpen,
+    isAddWeightOpen,
+    isEditProfileOpen,
+    isScientificAssessmentOpen,
+    isAuthModalOpen,
+    isTwoFactorModalOpen,
+    isNativeHealthNoticeOpen,
+    isFastingDetailOpen,
+    activeMealForReview,
+    activeMealForAdd,
+    activeTab
+  ]);
 
   // Complete onboarding from interactive survey
   const handleCompleteOnboarding = (

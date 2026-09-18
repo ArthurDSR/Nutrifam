@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NutriFam</string>
+    <string name="title_activity_main">NutriFam</string>
+    <string name="package_name">com.nutrifam.app</string>
+    <string name="custom_url_scheme">com.nutrifam.app</string>
+</resources>
