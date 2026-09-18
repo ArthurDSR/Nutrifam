@@ -1,0 +1,215 @@
+{
+  "generatedAt": "2026-09-18T22:28:09.322Z",
+  "source": "usda",
+  "input": "data/food-sources/usda-foundation-2026-04/FoodData_Central_foundation_food_json_2026-04-30.json",
+  "received": 363,
+  "accepted": 334,
+  "rejected": 29,
+  "catalogTotal": 334,
+  "policyVersion": "2026.09.1",
+  "rejectionDetails": [
+    {
+      "row": 2,
+      "name": "homus, industrializado",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 41,
+      "name": "Restaurant, Chinese, frito arroz, without meat",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 42,
+      "name": "Restaurant, Latino, tamale, carne suína",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 43,
+      "name": "Restaurant, Latino, pupusas con frijoles (pupusas, feijão)",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 60,
+      "name": "Restaurant, Chinese, sweet and sour carne suína",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 61,
+      "name": "Salt, table, iodized",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 72,
+      "name": "Ham, sliced, restaurant",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 73,
+      "name": "queijo, American, restaurant",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 92,
+      "name": "Ketchup, restaurant",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 95,
+      "name": "Oil, canola",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 96,
+      "name": "Oil, corn",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 97,
+      "name": "Oil, soybean",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 98,
+      "name": "Oil, olive, extra virgin",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 100,
+      "name": "carne suína, cured, bacon, cozido, restaurant",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 126,
+      "name": "Oil, peanut",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 127,
+      "name": "Oil, sunflower",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 128,
+      "name": "Oil, safflower",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 129,
+      "name": "Oil, olive, extra light",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 316,
+      "name": "frango, drumstick, meat and skin, cru",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 317,
+      "name": "frango, thigh, meat and skin, cru",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 318,
+      "name": "frango, wing, meat and skin, cru",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 319,
+      "name": "frango, breast, meat and skin, cru",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 320,
+      "name": "Lamb, ground, cru",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 321,
+      "name": "Bison, ground, cru",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 325,
+      "name": "carne suína, chop, center cut, cru",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 326,
+      "name": "carne suína, belly, with skin, cru",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 338,
+      "name": "Juice, pomegranate, from concentrate, shelf-stable",
+      "errors": [
+        "sem dados nutricionais"
+      ]
+    },
+    {
+      "row": 344,
+      "name": "Halibut, frozen, wild caught",
+      "errors": [
+        "carbs negativo"
+      ]
+    },
+    {
+      "row": 361,
+      "name": "Tuna, ahi or yellowfin, frozen, wild caught",
+      "errors": [
+        "carbs negativo"
+      ]
+    }
+  ]
+}

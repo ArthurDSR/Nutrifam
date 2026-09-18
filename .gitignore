@@ -1,4 +1,6 @@
 node_modules/
+data/food-sources/usda-foundation-*/
+data/food-sources/usda-foundation-*.zip
 dist/
 .env
 .env.*

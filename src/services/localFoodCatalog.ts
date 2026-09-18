@@ -5,7 +5,7 @@ import { FoodItem } from '../types';
 import { isCatalogEligibleFood } from './foodCatalogPolicy';
 import { normalizeCatalogText } from './localFoodCatalogText';
 
-export const LOCAL_CATALOG_VERSION = '2026.09.3';
+export const LOCAL_CATALOG_VERSION = '2026.09.4';
 
 const DB_NAME = 'nutrifam-food-catalog';
 const DB_VERSION = 1;

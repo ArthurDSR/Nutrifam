@@ -18,6 +18,7 @@ export interface FoodItem {
   imageUrl?: string;
   catalogSource?: 'taco' | 'tbca' | 'usda' | 'brazilian' | 'manufacturer' | 'canonical' | 'user' | 'legacy';
   normalizedName?: string;
+  sourceName?: string;
   verificationStatus?: 'verified' | 'pending' | 'user';
   novaGroup?: 1 | 2 | 3 | 4; // 1: In natura, 2: Culinário, 3: Processado, 4: Ultraprocessado
   processingGrade?: 'In Natura' | 'Minimamente Processado' | 'Processado' | 'Ultraprocessado';

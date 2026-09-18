@@ -18,7 +18,10 @@
     "x bacon",
     "x egg",
     "x frango",
-    "x salada"
+    "x salada",
+    "restaurant",
+    "industrializado",
+    "commercial"
   ],
   "policyVersion": "2026.09.1"
 }

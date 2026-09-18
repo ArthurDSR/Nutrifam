@@ -34,6 +34,27 @@ const normalizeText = (value = '') => String(value)
   .replace(/\s+/g, ' ')
   .trim();
 
+const usdaTranslations = [
+  [/\braw\b/gi, 'cru'], [/\bcooked\b/gi, 'cozido'], [/\broasted\b/gi, 'assado'],
+  [/\bboiled\b/gi, 'cozido'], [/\bfried\b/gi, 'frito'], [/\bwithout salt\b/gi, 'sem sal'],
+  [/\bwith salt\b/gi, 'com sal'], [/\bskinless\b/gi, 'sem pele'], [/\bboneless\b/gi, 'sem osso'],
+  [/\btomatoes?\b/gi, 'tomate'], [/\bpotatoes?\b/gi, 'batata'], [/\bonions?\b/gi, 'cebola'],
+  [/\bcarrots?\b/gi, 'cenoura'], [/\bapples?\b/gi, 'maçã'], [/\bbananas?\b/gi, 'banana'],
+  [/\boranges?\b/gi, 'laranja'], [/\bstrawberries\b/gi, 'morango'], [/\bgrapes?\b/gi, 'uva'],
+  [/\bbeans?\b/gi, 'feijão'], [/\brice\b/gi, 'arroz'], [/\boats?\b/gi, 'aveia'],
+  [/\bchicken\b/gi, 'frango'], [/\bbeef\b/gi, 'carne bovina'], [/\bpork\b/gi, 'carne suína'],
+  [/\bfish\b/gi, 'peixe'], [/\beggs?\b/gi, 'ovo'], [/\bmilk\b/gi, 'leite'],
+  [/\bcheese\b/gi, 'queijo'], [/\byogurt\b/gi, 'iogurte'], [/\bbutter\b/gi, 'manteiga'],
+  [/\bbroccoli\b/gi, 'brócolis'], [/\bspinach\b/gi, 'espinafre'], [/\bavocado\b/gi, 'abacate'],
+  [/\bhummus\b/gi, 'homus'], [/\bcommercial\b/gi, 'industrializado']
+];
+
+const translateUsdaDescription = (description) => {
+  let translated = String(description || '');
+  for (const [pattern, replacement] of usdaTranslations) translated = translated.replace(pattern, replacement);
+  return translated.replace(/\s+,/g, ',').trim();
+};
+
 const number = (value) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   const normalized = String(value ?? '').trim().replace(',', '.').replace(/[^0-9.-]/g, '');
@@ -99,7 +120,8 @@ const aliases = {
 };
 
 function mapRow(row, index) {
-  const name = String(first(row, aliases.name) || '').trim();
+  const originalName = String(first(row, aliases.name) || '').trim();
+  const name = source === 'usda' ? translateUsdaDescription(originalName) : originalName;
   const brand = String(first(row, aliases.brand) || '').trim();
   const barcode = String(first(row, aliases.barcode) || '').replace(/\D/g, '');
   const servingGrams = number(first(row, aliases.servingGrams)) || 100;
@@ -107,12 +129,14 @@ function mapRow(row, index) {
   const hash = createHash('sha1').update(`${source}:${sourceId}:${name}:${brand}`).digest('hex').slice(0, 12);
   const nova = Math.round(number(first(row, aliases.novaGroup)));
 
-  const usdaNutrients = Array.isArray(row.foodNutrients)
-    ? Object.fromEntries(row.foodNutrients.map((entry) => [normalizeText(entry.nutrient?.name || entry.nutrientName), entry.amount ?? entry.value]))
-    : {};
-  const nutrient = (names, fallbackAliases) => {
-    for (const name of names) {
-      if (usdaNutrients[name] !== undefined) return number(usdaNutrients[name]);
+  const usdaNutrients = Array.isArray(row.foodNutrients) ? row.foodNutrients : [];
+  const nutrient = (names, fallbackAliases, unit) => {
+    for (const entry of usdaNutrients) {
+      const nutrientName = normalizeText(entry.nutrient?.name || entry.nutrientName);
+      const nutrientUnit = normalizeText(entry.nutrient?.unitName || entry.unitName);
+      if (names.includes(nutrientName) && (!unit || nutrientUnit === unit)) {
+        return number(entry.amount ?? entry.value);
+      }
     }
     return number(first(row, fallbackAliases));
   };
@@ -123,7 +147,7 @@ function mapRow(row, index) {
     id: `import_${source}_${hash}`,
     name,
     ...(brand ? { brand } : {}),
-    calories: nutrient(['energy', 'energy kcal'], aliases.calories),
+    calories: nutrient(['energy', 'energy kcal'], aliases.calories, 'kcal'),
     servingSize: String(first(row, aliases.servingSize) || `${servingGrams} g`),
     servingGrams,
     protein: nutrient(['protein'], aliases.protein),
@@ -136,6 +160,7 @@ function mapRow(row, index) {
     catalogSource: source === 'manufacturer' ? 'manufacturer' : source,
     normalizedName: normalizeText(`${name} ${brand}`),
     verificationStatus: source === 'manufacturer' ? 'pending' : 'verified',
+    ...(source === 'usda' && originalName !== name ? { sourceName: originalName } : {}),
     ...(row.isRecipe === true && recipeIngredients?.length && recipeYieldPortions > 0
       ? { isRecipe: true, recipeIngredients, recipeYieldPortions }
       : {})
@@ -177,13 +202,14 @@ const raw = await readFile(inputPath, 'utf8');
 const parsed = inputPath.toLowerCase().endsWith('.json')
   ? JSON.parse(raw)
   : parseCsv(raw.replace(/^\uFEFF/, ''));
-const rows = Array.isArray(parsed) ? parsed : parsed.foods;
+const rows = Array.isArray(parsed) ? parsed : parsed.foods || parsed.FoundationFoods;
 if (!Array.isArray(rows)) throw new Error('O arquivo deve conter uma lista de alimentos.');
+const usableRows = rows.filter((row) => row && typeof row === 'object');
 
 const accepted = [];
 const rejected = [];
 const duplicateKeys = new Set();
-rows.forEach((row, index) => {
+usableRows.forEach((row, index) => {
   const food = mapRow(row, index);
   const errors = validate(food);
   const key = food.barcode ? `barcode:${food.barcode}` : `${food.normalizedName}:${food.servingGrams}`;
@@ -212,8 +238,8 @@ const catalog = [...merged.values()].sort((a, b) => a.normalizedName.localeCompa
 const report = {
   generatedAt: new Date().toISOString(),
   source,
-  input: inputPath,
-  received: rows.length,
+  input: path.relative(process.cwd(), inputPath).replace(/\\/g, '/'),
+  received: usableRows.length,
   accepted: accepted.length,
   rejected: rejected.length,
   catalogTotal: catalog.length,
