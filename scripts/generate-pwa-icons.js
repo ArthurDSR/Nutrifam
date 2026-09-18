@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+import fs from 'fs';
+import { Resvg } from '@resvg/resvg-js';
+
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="iconBg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#FFFDF9" />
@@ -56,4 +59,23 @@
     <path d="M 100 21 L 100 54" stroke="#C49BC8" stroke-width="1.5" />
     <circle cx="100" cy="20" r="3.5" fill="#B88EC0" />
   </g>
-</svg>
+</svg>`;
+
+fs.writeFileSync('public/icon.svg', svg, 'utf8');
+
+// 512x512 PNG
+const resvg512 = new Resvg(svg, { fitTo: { mode: 'width', value: 512 } });
+const png512 = resvg512.render().asPng();
+fs.writeFileSync('public/pwa-512x512.png', png512);
+
+// 192x192 PNG
+const resvg192 = new Resvg(svg, { fitTo: { mode: 'width', value: 192 } });
+const png192 = resvg192.render().asPng();
+fs.writeFileSync('public/pwa-192x192.png', png192);
+
+// 180x180 Apple Touch Icon PNG
+const resvg180 = new Resvg(svg, { fitTo: { mode: 'width', value: 180 } });
+const png180 = resvg180.render().asPng();
+fs.writeFileSync('public/apple-touch-icon.png', png180);
+
+console.log('Successfully generated all PWA raccoon icons!');

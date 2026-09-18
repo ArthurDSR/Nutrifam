@@ -29,6 +29,24 @@ export interface HealthSyncResult {
 const HEALTH_CONFIG_KEY = 'nutrifam_health_sync_config';
 
 /**
+ * Detects if the app is currently running inside Capacitor native container (iOS/Android)
+ */
+export function isCapacitorNative(): boolean {
+  if (typeof window === 'undefined') return false;
+  const win = window as any;
+  if (win.Capacitor) {
+    if (typeof win.Capacitor.isNativePlatform === 'function') {
+      return win.Capacitor.isNativePlatform();
+    }
+    if (typeof win.Capacitor.getPlatform === 'function') {
+      const platform = win.Capacitor.getPlatform();
+      return platform === 'ios' || platform === 'android';
+    }
+  }
+  return false;
+}
+
+/**
  * Detects client device platform (iOS, Android or Web)
  */
 export function detectDevicePlatform(): HealthPlatform {
@@ -139,7 +157,15 @@ export function getHealthProviderDetails(provider: HealthProviderType): {
  */
 export async function connectHealthProvider(
   provider: HealthProviderType
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; requiresNative?: boolean }> {
+  if (!isCapacitorNative()) {
+    return {
+      success: false,
+      message: 'A sincronização com Apple Health e Android Health Connect está disponível exclusivamente no aplicativo móvel nativo (iOS / Android).',
+      requiresNative: true
+    };
+  }
+
   const details = getHealthProviderDetails(provider);
 
   const config = getHealthSyncConfig();
@@ -169,6 +195,18 @@ export function disconnectHealthProvider(): void {
 export async function syncHealthData(
   targetDate = getTodayDateString()
 ): Promise<HealthSyncResult> {
+  if (!isCapacitorNative()) {
+    return {
+      success: false,
+      message: 'A sincronização de dados biométricos requer o aplicativo nativo NutriFam no iOS ou Android.',
+      provider: 'none',
+      burnedCalories: 0,
+      steps: 0,
+      importedActivities: [],
+      syncTimestamp: new Date().toISOString()
+    };
+  }
+
   const config = getHealthSyncConfig();
   const provider = config.provider === 'none' ? getDefaultHealthProvider() : config.provider;
   const details = getHealthProviderDetails(provider);

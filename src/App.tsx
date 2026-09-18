@@ -25,7 +25,8 @@ import { AuthModal } from './components/auth/AuthModal';
 import { TwoFactorModal } from './components/auth/TwoFactorModal';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { OnboardingSurvey } from './components/onboarding/OnboardingSurvey';
-import { syncHealthData } from './services/healthSyncService';
+import { NativeHealthNoticeModal } from './components/health/NativeHealthNoticeModal';
+import { syncHealthData, isCapacitorNative } from './services/healthSyncService';
 import { getLocalAuthUser, setLocalAuthUser, logoutAccount, AuthUser } from './services/authService';
 import { calculateFastingWindow } from './services/fastingScheduler';
 import { syncDayLogMealTargets } from './services/nutritionCalculator';
@@ -96,6 +97,7 @@ export const App: React.FC = () => {
   const [isSyncingHealth, setIsSyncingHealth] = useState(false);
   const [healthSyncToast, setHealthSyncToast] = useState<string | null>(null);
   const [isOnboardingSurveyOpen, setIsOnboardingSurveyOpen] = useState(false);
+  const [isNativeHealthNoticeOpen, setIsNativeHealthNoticeOpen] = useState(false);
 
   const hasLoadedRemote = useRef(false);
 
@@ -667,6 +669,14 @@ export const App: React.FC = () => {
   };
 
   const handleSyncHealth = async (silent = false) => {
+    // If running on Web / PWA, health sensor access is restricted to the native Capacitor mobile app
+    if (!isCapacitorNative()) {
+      if (!silent) {
+        setIsNativeHealthNoticeOpen(true);
+      }
+      return;
+    }
+
     if (!silent) {
       setIsSyncingHealth(true);
       setHealthSyncToast(null);
@@ -713,9 +723,9 @@ export const App: React.FC = () => {
     }
   };
 
-  // Background auto-sync when health provider is connected
+  // Background auto-sync when health provider is connected (Capacitor native app only)
   useEffect(() => {
-    if (profile.appleHealthSynced) {
+    if (profile.appleHealthSynced && isCapacitorNative()) {
       handleSyncHealth(true);
     }
   }, [profile.appleHealthSynced, selectedDate]);
@@ -776,6 +786,11 @@ export const App: React.FC = () => {
   };
 
   const handleToggleAppleHealth = () => {
+    if (!isCapacitorNative()) {
+      setIsNativeHealthNoticeOpen(true);
+      return;
+    }
+
     if (!profile.appleHealthSynced) {
       handleSyncHealth(false);
     } else {
@@ -1152,6 +1167,12 @@ export const App: React.FC = () => {
           <span>{healthSyncToast}</span>
         </div>
       )}
+
+      {/* Native Health Notice Modal (App Mobile Exclusivity Warning) */}
+      <NativeHealthNoticeModal
+        isOpen={isNativeHealthNoticeOpen}
+        onClose={() => setIsNativeHealthNoticeOpen(false)}
+      />
 
       {/* Animated Splash Screen ("NutriFam" with Raccoon Blinking) */}
       {showSplash && (

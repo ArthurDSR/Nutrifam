@@ -5,6 +5,7 @@ import { useTranslation, Language } from '../../services/i18n';
 import { testAIConnection } from '../../services/aiService';
 import { useTheme, PASTEL_COLORS, SecondaryColor, ThemeMode } from '../../services/themeService';
 import { FoodBudMascot } from '../pet/FoodBudMascot';
+import { isCapacitorNative } from '../../services/healthSyncService';
 
 interface SettingsModalProps {
   profile: UserProfile;
@@ -365,11 +366,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
                   profile.appleHealthSynced
                     ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
-                    : 'bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300'
+                    : isCapacitorNative()
+                    ? 'bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300'
+                    : 'bg-amber-100/70 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300/40 dark:border-amber-800/40'
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${profile.appleHealthSynced ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                {profile.appleHealthSynced ? t('health.linked') : t('health.disconnected')}
+                <span className={`w-1.5 h-1.5 rounded-full ${profile.appleHealthSynced ? 'bg-emerald-500' : (isCapacitorNative() ? 'bg-slate-400' : 'bg-amber-400')}`} />
+                {profile.appleHealthSynced ? t('health.linked') : (isCapacitorNative() ? t('health.disconnected') : 'Exclusivo do App')}
               </span>
             </div>
 
