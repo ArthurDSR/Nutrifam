@@ -30,6 +30,7 @@ interface SettingsModalProps {
 
 const OPENROUTER_PRESETS = [
   { id: 'openrouter/free', label: 'openrouter/free (Roteador Automático - 100% Grátis Oficial)' },
+  { id: 'google/gemini-3.5-flash-lite', label: 'google/gemini-3.5-flash-lite (Google Gemini 3.5 Flash-Lite)' },
   { id: 'deepseek/deepseek-v4-flash-0731:free', label: 'deepseek/deepseek-v4-flash-0731:free (Rápido e 100% Grátis)' },
   { id: 'qwen/qwen3.8-27b:free', label: 'qwen/qwen3.8-27b:free (Nutrição & Raciocínio Grátis)' },
   { id: 'google/gemma-4-31b-it:free', label: 'google/gemma-4-31b-it:free (Google Gemma 4 31B Grátis)' },
@@ -52,7 +53,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const { t, language, setLanguage } = useTranslation();
   const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'openrouter'>(profile.aiProvider || 'openrouter');
   const [geminiKey, setGeminiKey] = useState(profile.geminiApiKey || '');
-  const [geminiModel, setGeminiModel] = useState(profile.geminiModel || 'gemini-2.5-flash');
+  const [geminiModel, setGeminiModel] = useState(profile.geminiModel || 'gemini-3.5-flash-lite');
   const [openaiKey, setOpenaiKey] = useState(profile.openaiApiKey || '');
   const [openaiModel, setOpenaiModel] = useState(profile.openaiModel || 'gpt-4o-mini');
   const [openrouterKey, setOpenrouterKey] = useState(profile.openrouterApiKey || '');
@@ -710,14 +711,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onChange={(e) => setGeminiModel(e.target.value)}
                     className="w-full p-2 rounded-xl border border-[#AEBDB5]/40 dark:border-[#394842] focus:outline-none text-[11px] bg-white dark:bg-[#232D29] font-medium text-[#3F4B46] dark:text-[#EDF2EF]"
                   >
+                    <option value="gemini-3.5-flash-lite">
+                      gemini-3.5-flash-lite (Recomendado - Mais Novo, Ultra Rápido & Grátis)
+                    </option>
+                    <option value="gemini-3.5-flash">
+                      gemini-3.5-flash (Nova geração 3.5 Flash)
+                    </option>
                     <option value="gemini-2.5-flash">
-                      gemini-2.5-flash (Recomendado - Mais recente, rápido e gratuito)
+                      gemini-2.5-flash (Geração 2.5 Flash)
                     </option>
                     <option value="gemini-2.0-flash">
-                      gemini-2.0-flash (Nova geração 2.0 com visão de fotos)
-                    </option>
-                    <option value="gemini-2.0-flash-lite">
-                      gemini-2.0-flash-lite (Ultra leve com menor latência)
+                      gemini-2.0-flash (Geração 2.0 com visão de fotos)
                     </option>
                   </select>
                   <p className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] mt-1">

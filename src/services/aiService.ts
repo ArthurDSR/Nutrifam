@@ -284,10 +284,12 @@ function localRuleBasedParser(text: string): ParsedFoodResult {
 export async function callGeminiApi(
   apiKey: string,
   body: any,
-  preferredModel = 'gemini-2.5-flash'
+  preferredModel = 'gemini-3.5-flash-lite'
 ): Promise<Response> {
   const modelsToTry = [
     preferredModel,
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-2.0-flash-lite'
@@ -400,7 +402,7 @@ export async function testAIConnection(
       return { success: false, message: errData.error?.message || `Erro da OpenAI: status ${response.status}` };
     } else {
       // Google Gemini with automatic modern model fallback
-      const targetModel = model || 'gemini-2.5-flash';
+      const targetModel = model || 'gemini-3.5-flash-lite';
       const response = await callGeminiApi(
         cleanKey,
         {
@@ -559,7 +561,7 @@ Retorne ESTRITAMENTE um objeto JSON válido (sem tags markdown nem explicações
       };
     } else {
       // Gemini with modern model and fallback
-      const targetModel = model || 'gemini-2.5-flash';
+      const targetModel = model || 'gemini-3.5-flash-lite';
       const response = await callGeminiApi(
         cleanKey,
         {
@@ -752,7 +754,7 @@ Retorne ESTRITAMENTE um JSON no formato:
         }
       } else {
         // Gemini Vision with modern model fallback
-        const targetModel = model || 'gemini-2.5-flash';
+        const targetModel = model || 'gemini-3.5-flash-lite';
         const rawBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
         const response = await callGeminiApi(
           cleanKey,
@@ -1020,7 +1022,7 @@ Responda em português com conselhos práticos, empáticos e diretos em 2 a 3 fr
         {
           contents: [{ parts: [{ text: `${systemPrompt}\n\nPergunta do usuário: ${userMessage}` }] }]
         },
-        profile.geminiModel || 'gemini-2.5-flash'
+        profile.geminiModel || 'gemini-3.5-flash-lite'
       );
       if (res.ok) {
         const data = await res.json();

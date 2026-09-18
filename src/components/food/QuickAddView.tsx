@@ -45,7 +45,7 @@ export const QuickAddView: React.FC<QuickAddViewProps> = ({
       ? (openrouterModel || 'openrouter/free')
       : aiProvider === 'openai'
       ? (openaiModel || 'gpt-4o-mini')
-      : (geminiModel || 'gemini-2.5-flash');
+      : (geminiModel || 'gemini-3.5-flash-lite');
   const hasCustomKey = Boolean(activeApiKey && activeApiKey.trim() !== '');
 
   const sampleChips = [
@@ -142,7 +142,7 @@ export const QuickAddView: React.FC<QuickAddViewProps> = ({
                 ? `IA Ativa: OpenRouter (${openrouterModel || 'openrouter/free'})`
                 : aiProvider === 'openai'
                 ? `IA Ativa: OpenAI (${openaiModel || 'gpt-4o-mini'})`
-                : `IA Ativa: Gemini (${geminiModel || 'gemini-2.5-flash'})`
+                : `IA Ativa: Gemini (${geminiModel || 'gemini-3.5-flash-lite'})`
               : 'Modo Local (Estimativa Rápida)'}
           </span>
         </div>

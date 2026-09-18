@@ -45,7 +45,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
       ? (openrouterModel || 'openrouter/free')
       : aiProvider === 'openai'
       ? (openaiModel || 'gpt-4o-mini')
-      : (geminiModel || 'gemini-2.5-flash');
+      : (geminiModel || 'gemini-3.5-flash-lite');
   const hasCustomKey = Boolean(activeApiKey && activeApiKey.trim() !== '');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,7 +110,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
                 ? `Visão IA: OpenRouter (${openrouterModel || 'openrouter/free'})`
                 : aiProvider === 'openai'
                 ? `Visão IA: OpenAI (${openaiModel || 'gpt-4o-mini'})`
-                : `Visão IA: Gemini (${geminiModel || 'gemini-2.5-flash'})`
+                : `Visão IA: Gemini (${geminiModel || 'gemini-3.5-flash-lite'})`
               : 'Modo Local (Simulação de Prato Equilibrado)'}
           </span>
         </div>

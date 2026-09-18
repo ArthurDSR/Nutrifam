@@ -44,7 +44,7 @@ export const DEFAULT_PROFILE: UserProfile = {
   isOnboardingCompleted: false,
   aiProvider: 'openrouter',
   openrouterModel: 'openrouter/free',
-  geminiModel: 'gemini-2.5-flash',
+  geminiModel: 'gemini-3.5-flash-lite',
   openaiModel: 'gpt-4o-mini'
 };
 
@@ -135,7 +135,7 @@ export function getStoredProfile(userId?: string): UserProfile {
         isOnboardingCompleted: isCompleted,
         geminiModel: (parsed.geminiModel && parsed.geminiModel !== 'gemini-1.5-flash')
           ? parsed.geminiModel
-          : 'gemini-2.5-flash',
+          : 'gemini-3.5-flash-lite',
         openrouterModel: (parsed.openrouterModel && parsed.openrouterModel !== 'meta-llama/llama-3.3-70b-instruct:free' && parsed.openrouterModel !== 'google/gemini-2.0-flash-exp:free')
           ? parsed.openrouterModel
           : 'openrouter/free'

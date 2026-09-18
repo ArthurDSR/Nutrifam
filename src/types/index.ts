@@ -73,7 +73,7 @@ export interface UserProfile {
   appleHealthSynced: boolean;
   aiProvider?: 'gemini' | 'openai' | 'openrouter';
   geminiApiKey?: string;
-  geminiModel?: string; // 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-2.0-flash-lite'
+  geminiModel?: string; // 'gemini-3.5-flash-lite' | 'gemini-3.5-flash' | 'gemini-2.5-flash'
   openaiApiKey?: string;
   openaiModel?: string; // 'gpt-4o-mini' | 'gpt-4o'
   openrouterApiKey?: string;

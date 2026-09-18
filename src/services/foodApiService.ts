@@ -448,7 +448,7 @@ export async function estimateFoodWithAI(
         ? openrouterModel
         : provider === 'openai'
         ? openaiModel
-        : (geminiModel || 'gemini-2.5-flash');
+        : (geminiModel || 'gemini-3.5-flash-lite');
 
     const parsed = await parseQuickAddWithAI(
       description,
