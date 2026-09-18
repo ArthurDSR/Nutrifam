@@ -184,7 +184,7 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
           </svg>
 
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-4xl font-black font-mono tracking-tight text-[#18201D] dark:text-white">
+            <span className="text-5xl font-black font-mono tracking-tight text-[#18201D] dark:text-white">
               {formattedTime}
             </span>
             <span className="text-[11px] font-semibold text-[#6F7C76] dark:text-[#A8B8B1] mt-1">

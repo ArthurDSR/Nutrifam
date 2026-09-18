@@ -1,10 +1,31 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, Bot, User, Droplets, Flame, Scale, Dumbbell, Check, BookmarkPlus } from 'lucide-react';
-import { UserProfile, DayLog } from '../../types';
+import { Sparkles, Send, Bot, User, Droplets, Flame, Scale, Dumbbell, Check, BookmarkPlus, Utensils, ChefHat } from 'lucide-react';
+import { UserProfile, DayLog, FoodItem } from '../../types';
 import { WorkoutRoutine } from '../../types/workout';
 import { generateCoachAdvice, askCoachAI, CoachHistoryMessage } from '../../services/aiService';
-import { saveWorkoutRoutineToSupabase } from '../../services/supabaseClient';
+import { saveWorkoutRoutineToSupabase, saveCustomFoodToSupabase } from '../../services/supabaseClient';
 import { useTheme } from '../../services/themeService';
+
+export interface RecipeProposal {
+  name: string;
+  portions: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  instructions?: string;
+  ingredients: {
+    foodId?: string;
+    name: string;
+    grams: number;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    servingUnitName?: string;
+  }[];
+}
 
 interface CoachViewProps {
   profile: UserProfile;
@@ -12,6 +33,7 @@ interface CoachViewProps {
   geminiApiKey?: string;
   onOpenScientificAssessment?: () => void;
   onWorkoutRoutineCreated?: () => void;
+  onRecipeCreated?: (recipeFoodItem: FoodItem) => void;
 }
 
 interface Message {
@@ -20,6 +42,8 @@ interface Message {
   time: string;
   workoutProposal?: WorkoutRoutine;
   isSavedToRoutines?: boolean;
+  recipeProposal?: RecipeProposal;
+  isSavedToRecipes?: boolean;
 }
 
 /**
@@ -50,12 +74,43 @@ function extractWorkoutProposal(text: string): { cleanText: string; proposal?: W
   }
 }
 
+/**
+ * Extracts any ```recipe_proposal ... ``` code block from text and parses JSON
+ */
+function extractRecipeProposal(text: string): { cleanText: string; recipeProposal?: RecipeProposal } {
+  const match = text.match(/```recipe_proposal\s*([\s\S]*?)\s*```/);
+  if (!match) return { cleanText: text };
+
+  try {
+    const jsonStr = match[1].trim();
+    const parsed = JSON.parse(jsonStr);
+    const recipeProposal: RecipeProposal = {
+      name: parsed.name || 'Receita Sugerida pelo Coach IA',
+      portions: Number(parsed.portions) || 1,
+      calories: Number(parsed.calories) || 0,
+      protein: Number(parsed.protein) || 0,
+      carbs: Number(parsed.carbs) || 0,
+      fat: Number(parsed.fat) || 0,
+      fiber: Number(parsed.fiber) || 0,
+      instructions: parsed.instructions || '',
+      ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients : []
+    };
+
+    const cleanText = text.replace(/```recipe_proposal[\s\S]*?```/, '').trim();
+    return { cleanText, recipeProposal };
+  } catch (err) {
+    console.warn('Failed to parse recipe proposal JSON:', err);
+    return { cleanText: text };
+  }
+}
+
 export const CoachView: React.FC<CoachViewProps> = ({
   profile,
   todayLog,
   geminiApiKey,
   onOpenScientificAssessment,
-  onWorkoutRoutineCreated
+  onWorkoutRoutineCreated,
+  onRecipeCreated
 }) => {
   const { isDark, activeColor } = useTheme();
   const effectiveProfile = geminiApiKey
@@ -74,6 +129,7 @@ export const CoachView: React.FC<CoachViewProps> = ({
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [savingRoutineId, setSavingRoutineId] = useState<string | null>(null);
+  const [savingRecipeIndex, setSavingRecipeIndex] = useState<number | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -94,6 +150,62 @@ export const CoachView: React.FC<CoachViewProps> = ({
       alert('Não foi possível salvar a ficha. Verifique sua conexão.');
     } finally {
       setSavingRoutineId(null);
+    }
+  };
+
+  const handleSaveRecipeToCustomFoods = async (msgIndex: number, recipe: RecipeProposal) => {
+    setSavingRecipeIndex(msgIndex);
+    try {
+      const totalGrams = recipe.ingredients.reduce((acc, i) => acc + (Number(i.grams) || 0), 0);
+      const safePortions = Math.max(1, recipe.portions || 1);
+      const perPortionGrams = Math.round(totalGrams / safePortions) || 100;
+
+      const newFoodItem: FoodItem = {
+        id: `recipe_coach_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: recipe.name,
+        brand: 'NutriCoach Receitas',
+        calories: Math.round(recipe.calories),
+        servingSize: `1 porção (${perPortionGrams} g)`,
+        servingGrams: perPortionGrams,
+        servingUnitName: 'porção',
+        protein: Math.round(recipe.protein),
+        carbs: Math.round(recipe.carbs),
+        fat: Math.round(recipe.fat),
+        fiber: Math.round(recipe.fiber || 0),
+        category: 'Recipe',
+        isFavorite: true,
+        colorDot: '#10b981',
+        novaGroup: 2,
+        healthScore: 94,
+        preservativesCount: 0,
+        isRecipe: true,
+        recipeYieldPortions: safePortions,
+        recipeIngredients: recipe.ingredients.map((it) => ({
+          foodId: it.foodId || `ing_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name: it.name,
+          grams: Number(it.grams) || 0,
+          calories: Number(it.calories) || 0,
+          protein: Number(it.protein) || 0,
+          carbs: Number(it.carbs) || 0,
+          fat: Number(it.fat) || 0,
+          servingUnitName: it.servingUnitName || 'g'
+        }))
+      };
+
+      await saveCustomFoodToSupabase(newFoodItem, profile.id);
+
+      if (onRecipeCreated) {
+        onRecipeCreated(newFoodItem);
+      }
+
+      setMessages((prev) =>
+        prev.map((m, idx) => (idx === msgIndex ? { ...m, isSavedToRecipes: true } : m))
+      );
+    } catch (err) {
+      console.warn('Error saving AI recipe:', err);
+      alert('Não foi possível salvar a receita na nuvem. Verifique sua conexão.');
+    } finally {
+      setSavingRecipeIndex(null);
     }
   };
 
@@ -132,7 +244,8 @@ export const CoachView: React.FC<CoachViewProps> = ({
         rawReply = `Excelente pergunta, ${profile.name}! Para sustentar sua meta em ${profile.dailyCaloriesTarget} kcal, priorize hidratação adequada, ingestão consistente de proteínas em cada refeição e controle de porções de carboidratos refinados.`;
       }
 
-      const { cleanText, proposal } = extractWorkoutProposal(rawReply);
+      const { cleanText: step1Text, proposal: workoutProposal } = extractWorkoutProposal(rawReply);
+      const { cleanText, recipeProposal } = extractRecipeProposal(step1Text);
 
       setMessages((prev) => [
         ...prev,
@@ -140,8 +253,10 @@ export const CoachView: React.FC<CoachViewProps> = ({
           sender: 'ai',
           text: cleanText,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          workoutProposal: proposal,
-          isSavedToRoutines: false
+          workoutProposal,
+          isSavedToRoutines: false,
+          recipeProposal,
+          isSavedToRecipes: false
         }
       ]);
       setIsTyping(false);
@@ -305,6 +420,103 @@ export const CoachView: React.FC<CoachViewProps> = ({
                         <>
                           <BookmarkPlus className="w-3.5 h-3.5" />
                           Salvar na Minha Ficha de Treinos
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Recipe Proposal Interactive Card */}
+                {msg.recipeProposal && (
+                  <div className="mt-3 p-3.5 bg-[#F7F4EE] dark:bg-[#18201D] rounded-2xl border border-amber-500/30 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                        <ChefHat className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-black text-[#18201D] dark:text-white leading-tight truncate">
+                          {msg.recipeProposal.name}
+                        </h4>
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
+                          Receita Sugerida pelo Coach
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Macros Bar */}
+                    <div className="grid grid-cols-4 gap-1.5 p-2 rounded-xl bg-white dark:bg-[#232D29] border border-[#AEBDB5]/20 dark:border-[#394842] text-center">
+                      <div>
+                        <div className="text-xs font-black text-amber-600 dark:text-amber-400 font-mono">
+                          {msg.recipeProposal.calories}
+                        </div>
+                        <div className="text-[9px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">kcal</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                          {msg.recipeProposal.protein}g
+                        </div>
+                        <div className="text-[9px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">prot</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-blue-600 dark:text-blue-400 font-mono">
+                          {msg.recipeProposal.carbs}g
+                        </div>
+                        <div className="text-[9px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">carb</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-purple-600 dark:text-purple-400 font-mono">
+                          {msg.recipeProposal.fat}g
+                        </div>
+                        <div className="text-[9px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">gord</div>
+                      </div>
+                    </div>
+
+                    {/* Ingredients */}
+                    {msg.recipeProposal.ingredients && msg.recipeProposal.ingredients.length > 0 && (
+                      <div className="space-y-1 pt-1 border-t border-[#AEBDB5]/20 dark:border-[#394842]">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Ingredientes:</span>
+                        {msg.recipeProposal.ingredients.map((ing, ingIdx) => (
+                          <div key={ingIdx} className="flex items-center justify-between text-[10px]">
+                            <span className="font-semibold text-[#3F4B46] dark:text-[#EDF2EF] truncate max-w-[170px]">
+                              • {ing.name}
+                            </span>
+                            <span className="font-mono text-[#6F7C76] dark:text-[#A8B8B1]">
+                              {ing.servingUnitName || `${ing.grams}g`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Instructions */}
+                    {msg.recipeProposal.instructions && (
+                      <p className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] italic bg-white/50 dark:bg-black/20 p-2 rounded-xl">
+                        {msg.recipeProposal.instructions}
+                      </p>
+                    )}
+
+                    {/* Save Recipe Button */}
+                    <button
+                      type="button"
+                      disabled={msg.isSavedToRecipes || savingRecipeIndex === index}
+                      onClick={() => handleSaveRecipeToCustomFoods(index, msg.recipeProposal!)}
+                      className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs ${
+                        msg.isSavedToRecipes
+                          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                          : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white active:scale-95'
+                      }`}
+                    >
+                      {msg.isSavedToRecipes ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          Salva nas Minhas Receitas!
+                        </>
+                      ) : savingRecipeIndex === index ? (
+                        <>Salvando...</>
+                      ) : (
+                        <>
+                          <Utensils className="w-3.5 h-3.5" />
+                          Salvar nas Minhas Receitas
                         </>
                       )}
                     </button>

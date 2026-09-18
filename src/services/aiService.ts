@@ -976,7 +976,51 @@ DADOS DO USUÁRIO:
 DIRETRIZES DE RESPOSTA:
 1. Responda em português claro, empático e encorajador.
 2. Seja conciso e direto. Varie suas respostas conforme o que o usuário perguntou.
-3. Se o usuário pedir DICAS DE RECEITAS ou ideias de refeição: forneça receitas reais e práticas com ingredientes acessíveis, porções e macros aproximados.
+3. Se o usuário pedir RECEITAS, DICAS DE RECEITAS ou ideias de preparo: elabore a explicação, modo de preparo e adicione no final da mensagem OBRIGATORIAMENTE o bloco estruturado exatamente assim:
+\`\`\`recipe_proposal
+{
+  "name": "Nome da Receita (ex: Panqueca de Aveia e Banana)",
+  "portions": 1,
+  "calories": 280,
+  "protein": 15,
+  "carbs": 35,
+  "fat": 9,
+  "fiber": 4,
+  "instructions": "Amasse a banana, misture os ovos e aveia, e doure na frigideira untada por 2 minutos de cada lado.",
+  "ingredients": [
+    {
+      "foodId": "banana",
+      "name": "Banana Nanica",
+      "grams": 100,
+      "calories": 89,
+      "protein": 1.1,
+      "carbs": 22.8,
+      "fat": 0.3,
+      "servingUnitName": "1 unidade média"
+    },
+    {
+      "foodId": "egg",
+      "name": "Ovos de Galinha",
+      "grams": 100,
+      "calories": 140,
+      "protein": 12.5,
+      "carbs": 1.0,
+      "fat": 9.8,
+      "servingUnitName": "2 unidades"
+    },
+    {
+      "foodId": "oat_flour",
+      "name": "Farinha de Aveia",
+      "grams": 30,
+      "calories": 110,
+      "protein": 4.2,
+      "carbs": 18.0,
+      "fat": 2.1,
+      "servingUnitName": "2 colheres de sopa"
+    }
+  ]
+}
+\`\`\`
 4. Se o usuário pedir para MONTAR UM TREINO ou fichas de exercícios: elabore a sugestão explicativa e adicione no final da mensagem OBRIGATORIAMENTE o bloco estruturado exatamente assim:
 \`\`\`workout_proposal
 {
@@ -1263,31 +1307,169 @@ Deseja salvar essa ficha na sua lista de treinos?`;
       return `Aqui está uma receita incrível de **Panqueca Fit de Banana com Aveia e Canela**:
 - 1 banana madura amassada
 - 2 ovos inteiros
-- 2 colheres de sopa de farinha ou farelo de aveia (30g)
+- 2 colheres de sopa de farinha de aveia (30g)
 - 1 pitada de canela em pó
 
-Misture tudo com um garfo e doure em frigideira antiaderente levemente untada.
-Macros estimados: ~280 kcal | 15g proteína | 35g carbo | 9g gordura. Saciedade alta e zero açúcar adicionado!`;
+Misture tudo com um garfo e doure em frigideira antiaderente levemente untada por 2 minutos de cada lado.
+Macros: ~280 kcal | 15g proteína | 35g carbo | 9g gordura. Saciedade alta e zero açúcar adicionado!
+
+\`\`\`recipe_proposal
+{
+  "name": "Panqueca Fit de Banana e Aveia",
+  "portions": 1,
+  "calories": 280,
+  "protein": 15,
+  "carbs": 35,
+  "fat": 9,
+  "fiber": 4,
+  "instructions": "Amasse a banana, adicione os ovos batidos e a farinha de aveia. Cozinhe em fogo baixo em frigideira untada por 2 min de cada lado.",
+  "ingredients": [
+    {
+      "foodId": "banana",
+      "name": "Banana Nanica",
+      "grams": 100,
+      "calories": 89,
+      "protein": 1.1,
+      "carbs": 22.8,
+      "fat": 0.3,
+      "servingUnitName": "1 unidade média"
+    },
+    {
+      "foodId": "egg",
+      "name": "Ovos de Galinha",
+      "grams": 100,
+      "calories": 140,
+      "protein": 12.5,
+      "carbs": 1.0,
+      "fat": 9.8,
+      "servingUnitName": "2 unidades"
+    },
+    {
+      "foodId": "oat_flour",
+      "name": "Farinha de Aveia",
+      "grams": 30,
+      "calories": 110,
+      "protein": 4.2,
+      "carbs": 18.0,
+      "fat": 2.1,
+      "servingUnitName": "2 colheres de sopa"
+    }
+  ]
+}
+\`\`\`
+Você pode salvar esta receita diretamente na sua aba de Receitas clicando abaixo!`;
     }
 
     if (lower.includes('proteico') || lower.includes('proteína') || lower.includes('pos treino') || lower.includes('pós-treino')) {
       return `Experimente este **Creme Proteico de Frutas Vermelhas**:
 - 1 pote de iogurte natural desnatado (160g)
-- 1 scoop (30g) de Whey Protein de baunilha ou morango
-- 50g de morangos picados ou frutas vermelhas
-- 1 colher de sopa de sementes de chia
+- 1 scoop (30g) de Whey Protein
+- 50g de morangos picados
+- 1 colher de sopa de sementes de chia (10g)
 
-Misture o iogurte e o whey até ficar homogêneo e finalize com as frutas.
-Macros: ~220 kcal | 32g proteína | 14g carbo | 3g gordura. Perfeito para síntese proteica muscular!`;
+Misture o iogurte e o whey até homogeneizar e finalize com as frutas e a chia.
+Macros: ~220 kcal | 32g proteína | 14g carbo | 3g gordura boa.
+
+\`\`\`recipe_proposal
+{
+  "name": "Creme Proteico de Frutas Vermelhas",
+  "portions": 1,
+  "calories": 220,
+  "protein": 32,
+  "carbs": 14,
+  "fat": 3,
+  "fiber": 4,
+  "instructions": "Misture vigorosamente o iogurte desnatado com o scoop de whey até obter consistência de mousse. Adicione os morangos e sementes de chia no topo.",
+  "ingredients": [
+    {
+      "foodId": "yogurt_greek_nonfat",
+      "name": "Iogurte Natural Desnatado",
+      "grams": 160,
+      "calories": 90,
+      "protein": 14.0,
+      "carbs": 8.0,
+      "fat": 0.5,
+      "servingUnitName": "1 pote (160g)"
+    },
+    {
+      "foodId": "whey_protein",
+      "name": "Whey Protein Concentrado/Isolado",
+      "grams": 30,
+      "calories": 120,
+      "protein": 24.0,
+      "carbs": 2.0,
+      "fat": 1.5,
+      "servingUnitName": "1 scoop (30g)"
+    },
+    {
+      "foodId": "strawberries",
+      "name": "Morangos Frescos",
+      "grams": 50,
+      "calories": 16,
+      "protein": 0.3,
+      "carbs": 3.8,
+      "fat": 0.1,
+      "servingUnitName": "3 unidades"
+    }
+  ]
+}
+\`\`\`
+Clique abaixo para salvar na sua aba de Receitas!`;
     }
 
     return `Uma das melhores refeições práticas para sua meta é o **Omelete Rápido NutriFam**:
-- 3 ovos (2 claras e 1 gema para equilibrar gorduras)
-- 2 colheres de sopa de queijo cottage ou ricota
-- Tomate cereja e orégano a gosto
+- 3 ovos inteiros
+- 2 colheres de sopa de queijo cottage ou ricota (40g)
+- Tomate picado e orégano a gosto
 
-Bata os ovos com garfo, coloque na frigideira em fogo baixo, adicione o queijo e feche como uma meia-lua.
-Macros: ~210 kcal | 22g proteína | 3g carbo | 12g gordura boa.`;
+Bata os ovos, despeje na frigideira antiaderente em fogo brando, adicione o cottage e dobre.
+Macros: ~230 kcal | 23g proteína | 3g carbo | 13g gordura boa.
+
+\`\`\`recipe_proposal
+{
+  "name": "Omelete Rápido com Cottage e Ervas",
+  "portions": 1,
+  "calories": 230,
+  "protein": 23,
+  "carbs": 3,
+  "fat": 13,
+  "fiber": 1,
+  "instructions": "Bata os ovos com uma pitada de sal e orégano. Despeje na frigideira pré-aquecida, recheie com o queijo cottage e dobre em meia-lua.",
+  "ingredients": [
+    {
+      "foodId": "egg",
+      "name": "Ovos de Galinha",
+      "grams": 150,
+      "calories": 195,
+      "protein": 18.0,
+      "carbs": 1.5,
+      "fat": 13.5,
+      "servingUnitName": "3 unidades"
+    },
+    {
+      "foodId": "cottage_cheese",
+      "name": "Queijo Cottage",
+      "grams": 40,
+      "calories": 38,
+      "protein": 4.5,
+      "carbs": 1.2,
+      "fat": 1.5,
+      "servingUnitName": "2 colheres de sopa"
+    },
+    {
+      "foodId": "tomato",
+      "name": "Tomate Fresco em Cubos",
+      "grams": 50,
+      "calories": 9,
+      "protein": 0.4,
+      "carbs": 1.9,
+      "fat": 0.1,
+      "servingUnitName": "1/2 unidade"
+    }
+  ]
+}
+\`\`\`
+Deseja salvar essa receita no seu banco de receitas?`;
   }
 
   // Supplements Intent

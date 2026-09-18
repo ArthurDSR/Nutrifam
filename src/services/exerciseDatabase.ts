@@ -1,4 +1,5 @@
 import { Exercise, MuscleCategory } from '../types/workout';
+import { EXERCISE_GIF_MAP } from './exerciseGifMap';
 
 export const EXERCISE_DATABASE: Exercise[] = [
   // --- PEITO (CHEST) ---
@@ -677,16 +678,32 @@ export const EXERCISE_DATABASE: Exercise[] = [
   }
 ];
 
+export { EXERCISE_GIF_MAP };
+
+export function getExerciseGifUrl(exerciseId: string): string {
+  return EXERCISE_GIF_MAP[exerciseId] || '';
+}
+
+function enrichExercise(e: Exercise): Exercise {
+  const gifUrl = e.gifUrl || EXERCISE_GIF_MAP[e.id] || '';
+  return {
+    ...e,
+    gifUrl,
+    thumbnailUrl: e.thumbnailUrl || gifUrl
+  };
+}
+
 export function getAllExercises(): Exercise[] {
-  return EXERCISE_DATABASE;
+  return EXERCISE_DATABASE.map(enrichExercise);
 }
 
 export function getExerciseById(id: string): Exercise | undefined {
-  return EXERCISE_DATABASE.find((e) => e.id === id);
+  const found = EXERCISE_DATABASE.find((e) => e.id === id);
+  return found ? enrichExercise(found) : undefined;
 }
 
 export function getExercisesByCategory(category: MuscleCategory): Exercise[] {
-  return EXERCISE_DATABASE.filter((e) => e.category === category);
+  return EXERCISE_DATABASE.filter((e) => e.category === category).map(enrichExercise);
 }
 
 export function searchExercises(query: string, category?: MuscleCategory): Exercise[] {
@@ -700,5 +717,6 @@ export function searchExercises(query: string, category?: MuscleCategory): Exerc
       (e.nameEn && e.nameEn.toLowerCase().includes(cleanQuery)) ||
       e.targetMuscle.toLowerCase().includes(cleanQuery)
     );
-  });
+  }).map(enrichExercise);
 }
+

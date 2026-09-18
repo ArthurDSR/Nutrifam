@@ -83,6 +83,16 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('journal');
   const [profileSubTab, setProfileSubTab] = useState<ProfileSubTab>('weight');
 
+  // Detect shared workout link on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('shared_workout')) {
+        setActiveTab('workouts');
+      }
+    }
+  }, []);
+
   // Modals & Subviews
   const [activeMealForAdd, setActiveMealForAdd] = useState<MealType | null>(null);
   const [addFoodInitialSubTab, setAddFoodInitialSubTab] = useState<AddFoodSubTab>('search');
@@ -982,6 +992,7 @@ export const App: React.FC = () => {
             geminiApiKey={profile.geminiApiKey}
             onOpenScientificAssessment={() => setIsScientificAssessmentOpen(true)}
             onWorkoutRoutineCreated={() => setActiveTab('workouts')}
+            onRecipeCreated={handleCreateCustomFood}
           />
         )}
 

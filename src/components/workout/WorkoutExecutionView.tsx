@@ -8,19 +8,29 @@ import {
   Flame,
   Award,
   X,
-  Search
+  Search,
+  Timer
 } from 'lucide-react';
 import {
   WorkoutRoutine,
   ActiveWorkoutSession,
   WorkoutSet,
-  CompletedWorkout
+  CompletedWorkout,
+  SetType
 } from '../../types/workout';
 import { UserProfile } from '../../types';
 import { EXERCISE_DATABASE, searchExercises } from '../../services/exerciseDatabase';
 import { finishAndSaveWorkout } from '../../services/workoutService';
 import { RestTimerModal } from './RestTimerModal';
+import { ExerciseThumbnail } from './ExerciseThumbnail';
 import { useTheme } from '../../services/themeService';
+
+function formatMinutesSeconds(totalSeconds: number): string {
+  const safeSec = Math.max(0, totalSeconds || 0);
+  const m = Math.floor(safeSec / 60);
+  const s = safeSec % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
 
 interface WorkoutExecutionViewProps {
   routine?: WorkoutRoutine | null;
@@ -46,19 +56,26 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
         routineId: routine.id,
         routineTitle: routine.title,
         startTime,
-        exercises: routine.exercises.map((re) => ({
-          exerciseId: re.exerciseId,
-          exerciseName: re.exerciseName,
-          category: re.category,
-          restSeconds: re.restSeconds || 60,
-          sets: Array.from({ length: re.targetSets || 3 }).map((_, idx) => ({
-            id: `set_${idx}_${Math.random().toString(36).substring(2, 5)}`,
-            setNumber: idx + 1,
-            weightKg: 0,
-            reps: 10,
-            isCompleted: false
-          }))
-        }))
+        exercises: routine.exercises.map((re) => {
+          const numSets = re.targetSets || (re.sets ? re.sets.length : 3);
+          return {
+            exerciseId: re.exerciseId,
+            exerciseName: re.exerciseName,
+            category: re.category,
+            restSeconds: re.restSeconds || 60,
+            sets: Array.from({ length: numSets }).map((_, idx) => {
+              const preset = re.sets?.[idx];
+              return {
+                id: `set_${idx}_${Math.random().toString(36).substring(2, 5)}`,
+                setNumber: idx + 1,
+                type: preset?.type || 'normal',
+                weightKg: preset?.targetWeightKg || 0,
+                reps: preset?.targetReps ? parseInt(preset.targetReps) || 10 : 10,
+                isCompleted: false
+              };
+            })
+          };
+        })
       };
     } else {
       return {
@@ -154,6 +171,41 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
             sIdx === setIndex ? { ...s, [field]: Math.max(0, val) } : s
           );
           return { ...ex, sets: updatedSets };
+        }
+        return ex;
+      })
+    }));
+  };
+
+  const handleToggleSetType = (exerciseIndex: number, setIndex: number) => {
+    setSession((prev) => ({
+      ...prev,
+      exercises: prev.exercises.map((ex, idx) => {
+        if (idx === exerciseIndex) {
+          const cycle: SetType[] = ['normal', 'warmup', 'failure', 'dropset'];
+          const updatedSets = ex.sets.map((s, sIdx) => {
+            if (sIdx === setIndex) {
+              const cur = s.type || 'normal';
+              const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+              return { ...s, type: next };
+            }
+            return s;
+          });
+          return { ...ex, sets: updatedSets };
+        }
+        return ex;
+      })
+    }));
+  };
+
+  const handleAdjustExerciseRest = (exerciseIndex: number, deltaOrVal: number, isAbsolute = false) => {
+    setSession((prev) => ({
+      ...prev,
+      exercises: prev.exercises.map((ex, idx) => {
+        if (idx === exerciseIndex) {
+          const current = ex.restSeconds || 60;
+          const next = isAbsolute ? deltaOrVal : Math.max(15, Math.min(600, current + deltaOrVal));
+          return { ...ex, restSeconds: next };
         }
         return ex;
       })
@@ -323,20 +375,51 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
               className="bg-white dark:bg-[#1E2623] rounded-3xl p-4 border border-[#AEBDB5]/20 dark:border-[#394842] shadow-2xs"
             >
               {/* Exercise Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="text-xs font-black text-[#18201D] dark:text-white">
-                    {exercise.exerciseName}
-                  </h3>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-semibold">
-                    Descanso: {exercise.restSeconds}s
-                  </span>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <ExerciseThumbnail
+                    exerciseId={exercise.exerciseId}
+                    category={exercise.category}
+                    name={exercise.exerciseName}
+                    size="md"
+                    allowPreview={true}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xs sm:text-sm font-black text-[#0080FF] dark:text-blue-400 truncate">
+                      {exercise.exerciseName}
+                    </h3>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Timer className="w-3.5 h-3.5 text-[#0080FF] shrink-0" />
+                      <span className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">Descanso:</span>
+                      <span className="text-xs font-black font-mono text-[#0080FF]">
+                        {formatMinutesSeconds(exercise.restSeconds || 60)}
+                      </span>
+                      <div className="flex items-center gap-1 ml-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleAdjustExerciseRest(exIdx, -15)}
+                          className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#25302B] hover:bg-slate-200 text-[10px] font-bold text-slate-600 dark:text-slate-300 active:scale-95"
+                          title="Diminuir descanso em 15s"
+                        >
+                          -15s
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAdjustExerciseRest(exIdx, 15)}
+                          className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#25302B] hover:bg-slate-200 text-[10px] font-bold text-slate-600 dark:text-slate-300 active:scale-95"
+                          title="Aumentar descanso em 15s"
+                        >
+                          +15s
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <button
                   onClick={() => handleRemoveExercise(exIdx)}
-                  className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                  className="p-1.5 text-slate-400 hover:text-red-500 rounded-xl transition-colors shrink-0"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
 
@@ -360,11 +443,26 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
                         : 'bg-[#F7F4EE] dark:bg-[#232D29] border border-transparent'
                     }`}
                   >
-                    {/* Set Number */}
+                    {/* Set Number / Type Badge */}
                     <div className="col-span-2 flex items-center justify-center">
-                      <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-[#34423C] text-[11px] font-extrabold flex items-center justify-center text-[#18201D] dark:text-white">
-                        {set.setNumber}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSetType(exIdx, setIdx)}
+                        className="w-7 h-7 rounded-xl bg-slate-200/80 dark:bg-[#34423C] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+                        title="Clique para alternar: Normal, W (Warmup), F (Falha), D (Dropset)"
+                      >
+                        {set.type === 'warmup' ? (
+                          <span className="font-black text-[#E59819] text-xs">W</span>
+                        ) : set.type === 'failure' ? (
+                          <span className="font-black text-[#EB4D3D] text-xs">F</span>
+                        ) : set.type === 'dropset' ? (
+                          <span className="font-black text-purple-600 text-xs">D</span>
+                        ) : (
+                          <span className="text-[11px] font-extrabold text-[#18201D] dark:text-white">
+                            {set.setNumber}
+                          </span>
+                        )}
+                      </button>
                     </div>
 
                     {/* Weight Input */}
@@ -513,17 +611,26 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
                 <div
                   key={item.id}
                   onClick={() => handleAddExerciseFromPicker(item)}
-                  className="p-3 bg-[#F7F4EE] dark:bg-[#232D29] hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-2xl cursor-pointer flex items-center justify-between border border-[#AEBDB5]/20 dark:border-[#394842] transition-colors"
+                  className="p-2.5 bg-[#F7F4EE] dark:bg-[#232D29] hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-2xl cursor-pointer flex items-center justify-between gap-2.5 border border-[#AEBDB5]/20 dark:border-[#394842] transition-colors"
                 >
-                  <div>
-                    <h4 className="text-xs font-bold text-[#18201D] dark:text-white">
-                      {item.name}
-                    </h4>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                      {item.targetMuscle}
-                    </span>
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <ExerciseThumbnail
+                      exerciseId={item.id}
+                      category={item.category}
+                      name={item.name}
+                      size="sm"
+                      allowPreview={true}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs font-bold text-[#18201D] dark:text-white truncate">
+                        {item.name}
+                      </h4>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold truncate block">
+                        {item.targetMuscle}
+                      </span>
+                    </div>
                   </div>
-                  <Plus className="w-4 h-4 text-emerald-500" />
+                  <Plus className="w-4 h-4 text-emerald-500 shrink-0" />
                 </div>
               ))}
             </div>

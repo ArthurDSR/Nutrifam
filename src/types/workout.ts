@@ -17,6 +17,8 @@ export type EquipmentType =
   | 'bodyweight'
   | 'other';
 
+export type SetType = 'normal' | 'warmup' | 'failure' | 'dropset';
+
 export interface Exercise {
   id: string;
   name: string;
@@ -25,18 +27,27 @@ export interface Exercise {
   equipment: EquipmentType;
   targetMuscle: string;
   instructions: string;
+  gifUrl?: string;
+  thumbnailUrl?: string;
   isCustom?: boolean;
 }
 
 export interface WorkoutSet {
   id: string;
   setNumber: number;
+  type?: SetType;
   weightKg: number;
   reps: number;
   isCompleted: boolean;
   completedAt?: string;
   previousWeightKg?: number;
   previousReps?: number;
+}
+
+export interface RoutineExerciseSet {
+  type?: SetType;
+  targetWeightKg?: number;
+  targetReps?: string;
 }
 
 export interface RoutineExercise {
@@ -47,6 +58,7 @@ export interface RoutineExercise {
   targetReps: string; // Ex: "8-12" ou "10"
   restSeconds: number; // Ex: 60, 90, 120
   notes?: string;
+  sets?: RoutineExerciseSet[];
 }
 
 export interface WorkoutRoutine {
@@ -66,6 +78,7 @@ export interface CompletedWorkoutExercise {
   category: MuscleCategory;
   sets: {
     setNumber: number;
+    type?: SetType;
     weightKg: number;
     reps: number;
   }[];

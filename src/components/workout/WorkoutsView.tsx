@@ -12,7 +12,9 @@ import {
   Clock,
   Flame,
   ChevronRight,
-  Search
+  Search,
+  Share2,
+  Download
 } from 'lucide-react';
 import {
   WorkoutRoutine,
@@ -30,6 +32,10 @@ import {
 import { searchExercises } from '../../services/exerciseDatabase';
 import { WorkoutExecutionView } from './WorkoutExecutionView';
 import { RoutineEditorModal } from './RoutineEditorModal';
+import { RoutineDetailModal } from './RoutineDetailModal';
+import { ShareWorkoutModal } from './ShareWorkoutModal';
+import { ImportWorkoutModal } from './ImportWorkoutModal';
+import { ExerciseThumbnail } from './ExerciseThumbnail';
 import { ExerciseProgressChart } from './ExerciseProgressChart';
 import { useTheme } from '../../services/themeService';
 
@@ -55,6 +61,14 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState<WorkoutRoutine | null>(null);
 
+  // Routine detail modal (Hevy-style)
+  const [selectedRoutineForDetail, setSelectedRoutineForDetail] = useState<WorkoutRoutine | null>(null);
+
+  // Sharing & Importing modals
+  const [sharingRoutine, setSharingRoutine] = useState<WorkoutRoutine | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importInitialCode, setImportInitialCode] = useState('');
+
   // Exercise database catalog state
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [selectedMuscleCategory, setSelectedMuscleCategory] = useState<MuscleCategory | ''>('');
@@ -76,6 +90,16 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
 
   useEffect(() => {
     loadData();
+
+    // Check for shared workout in URL parameter (?shared_workout=...)
+    if (typeof window !== 'undefined' && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const sharedCode = params.get('shared_workout');
+      if (sharedCode) {
+        setImportInitialCode(sharedCode);
+        setIsImportModalOpen(true);
+      }
+    }
   }, [profile.id]);
 
   // Start workout session
@@ -222,15 +246,27 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
             <h2 className="text-xs font-bold text-[#3F4B46] dark:text-[#EDF2EF] uppercase tracking-wider">
               Minhas Fichas ({routines.length})
             </h2>
-            <button
-              onClick={() => {
-                setEditingRoutine(null);
-                setIsEditorOpen(true);
-              }}
-              className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1 hover:bg-emerald-500/20 active:scale-95 transition-transform"
-            >
-              <Plus className="w-3.5 h-3.5" /> Nova Ficha
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setImportInitialCode('');
+                  setIsImportModalOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-200/70 dark:bg-[#25302B] text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1 hover:bg-slate-300 active:scale-95 transition-transform"
+                title="Importar ficha de treino compartilhada"
+              >
+                <Download className="w-3.5 h-3.5" /> Importar
+              </button>
+              <button
+                onClick={() => {
+                  setEditingRoutine(null);
+                  setIsEditorOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1 hover:bg-emerald-500/20 active:scale-95 transition-transform"
+              >
+                <Plus className="w-3.5 h-3.5" /> Nova Ficha
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -239,64 +275,77 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                 key={routine.id}
                 className="bg-white dark:bg-[#1E2623] rounded-3xl p-5 border border-[#AEBDB5]/20 dark:border-[#394842] shadow-2xs space-y-3"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                        {routine.category.toUpperCase()}
-                      </span>
-                      <span className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1]">
-                        {routine.exercises.length} exercícios
-                      </span>
+                <div
+                  className="cursor-pointer group"
+                  onClick={() => setSelectedRoutineForDetail(routine)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {routine.category.toUpperCase()}
+                        </span>
+                        <span className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1]">
+                          {routine.exercises.length} exercícios
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-black text-[#18201D] dark:text-white mt-1 group-hover:text-[#0080FF] transition-colors">
+                        {routine.title}
+                      </h3>
+                      {routine.description && (
+                        <p className="text-xs text-[#6F7C76] dark:text-[#A8B8B1] mt-0.5 line-clamp-2">
+                          {routine.description}
+                        </p>
+                      )}
                     </div>
-                    <h3 className="text-sm font-black text-[#18201D] dark:text-white mt-1">
-                      {routine.title}
-                    </h3>
-                    {routine.description && (
-                      <p className="text-xs text-[#6F7C76] dark:text-[#A8B8B1] mt-0.5 line-clamp-2">
-                        {routine.description}
-                      </p>
+
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setSharingRoutine(routine)}
+                        className="p-1.5 text-slate-400 hover:text-emerald-500 rounded-lg transition-colors"
+                        title="Compartilhar Ficha"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingRoutine(routine);
+                          setIsEditorOpen(true);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-emerald-500 rounded-lg transition-colors"
+                        title="Editar Ficha"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRoutine(routine.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                        title="Excluir Ficha"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Exercises preview snippet */}
+                  <div className="mt-3 p-3 bg-[#F7F4EE] dark:bg-[#232D29] rounded-2xl text-xs space-y-1.5">
+                    {routine.exercises.slice(0, 3).map((ex, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-[11px]">
+                        <ExerciseThumbnail exerciseId={ex.exerciseId} category={ex.category} size="sm" allowPreview={true} />
+                        <span className="text-[#3F4B46] dark:text-[#EDF2EF] font-semibold truncate flex-1">
+                          {ex.exerciseName}
+                        </span>
+                        <span className="text-[#6F7C76] dark:text-[#A8B8B1] font-mono">
+                          {ex.targetSets}×{ex.targetReps}
+                        </span>
+                      </div>
+                    ))}
+                    {routine.exercises.length > 3 && (
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold pt-0.5">
+                        + mais {routine.exercises.length - 3} exercícios...
+                      </div>
                     )}
                   </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setEditingRoutine(routine);
-                        setIsEditorOpen(true);
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-emerald-500 rounded-lg transition-colors"
-                      title="Editar Ficha"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteRoutine(routine.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
-                      title="Excluir Ficha"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Exercises preview snippet */}
-                <div className="p-3 bg-[#F7F4EE] dark:bg-[#232D29] rounded-2xl text-xs space-y-1">
-                  {routine.exercises.slice(0, 3).map((ex, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-[11px]">
-                      <span className="text-[#3F4B46] dark:text-[#EDF2EF] font-semibold truncate max-w-[200px]">
-                        • {ex.exerciseName}
-                      </span>
-                      <span className="text-[#6F7C76] dark:text-[#A8B8B1] font-mono">
-                        {ex.targetSets}×{ex.targetReps}
-                      </span>
-                    </div>
-                  ))}
-                  {routine.exercises.length > 3 && (
-                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold pt-0.5">
-                      + mais {routine.exercises.length - 3} exercícios...
-                    </div>
-                  )}
                 </div>
 
                 {/* Start Workout Button */}
@@ -494,23 +543,32 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
               <div
                 key={ex.id}
                 onClick={() => setViewingExerciseDetail(ex)}
-                className="bg-white dark:bg-[#1E2623] p-3.5 rounded-2xl border border-[#AEBDB5]/20 dark:border-[#394842] flex items-center justify-between cursor-pointer hover:bg-[#ECEFE7] dark:hover:bg-[#2B3732] transition-colors"
+                className="bg-white dark:bg-[#1E2623] p-3 rounded-2xl border border-[#AEBDB5]/20 dark:border-[#394842] flex items-center justify-between gap-3 cursor-pointer hover:bg-[#ECEFE7] dark:hover:bg-[#2B3732] transition-colors"
               >
-                <div>
-                  <h4 className="text-xs font-bold text-[#18201D] dark:text-white">
-                    {ex.name}
-                  </h4>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold uppercase">
-                      {ex.category}
-                    </span>
-                    <span className="text-slate-400">•</span>
-                    <span className="text-[10px] text-slate-500">
-                      {ex.targetMuscle}
-                    </span>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <ExerciseThumbnail
+                    exerciseId={ex.id}
+                    category={ex.category}
+                    name={ex.name}
+                    size="md"
+                    allowPreview={true}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs font-bold text-[#18201D] dark:text-white truncate">
+                      {ex.name}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold uppercase">
+                        {ex.category}
+                      </span>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-[10px] text-slate-500 truncate">
+                        {ex.targetMuscle}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
+                <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
               </div>
             ))}
           </div>
@@ -525,22 +583,79 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
         onSave={handleSaveRoutine}
       />
 
+      {/* Routine Detail Modal (Hevy Style) */}
+      {selectedRoutineForDetail && (
+        <RoutineDetailModal
+          routine={selectedRoutineForDetail}
+          onClose={() => setSelectedRoutineForDetail(null)}
+          onStartWorkout={(r) => {
+            setSelectedRoutineForDetail(null);
+            handleStartRoutineWorkout(r);
+          }}
+          onEditRoutine={(r) => {
+            setSelectedRoutineForDetail(null);
+            setEditingRoutine(r);
+            setIsEditorOpen(true);
+          }}
+          onShareRoutine={(r) => {
+            setSharingRoutine(r);
+          }}
+          onUpdateRoutine={async (updated) => {
+            await handleSaveRoutine(updated);
+            setSelectedRoutineForDetail(updated);
+          }}
+        />
+      )}
+
+      {/* Share Workout Modal */}
+      {sharingRoutine && (
+        <ShareWorkoutModal
+          routine={sharingRoutine}
+          onClose={() => setSharingRoutine(null)}
+        />
+      )}
+
+      {/* Import Workout Modal */}
+      {isImportModalOpen && (
+        <ImportWorkoutModal
+          initialCode={importInitialCode}
+          userId={profile.id}
+          onClose={() => {
+            setIsImportModalOpen(false);
+            setImportInitialCode('');
+          }}
+          onImportSuccess={(newRoutine) => {
+            setRoutines((prev) => [newRoutine, ...prev]);
+            setSelectedRoutineForDetail(newRoutine);
+          }}
+        />
+      )}
+
       {/* Exercise Detail Modal */}
       {viewingExerciseDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
           <div className="w-full max-w-sm bg-white dark:bg-[#1E2623] rounded-3xl p-6 shadow-2xl border border-[#AEBDB5]/20 dark:border-[#394842] space-y-4">
-            <div>
-              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                {viewingExerciseDetail.category} • {viewingExerciseDetail.equipment}
-              </span>
-              <h3 className="text-base font-black text-[#18201D] dark:text-white mt-1">
-                {viewingExerciseDetail.name}
-              </h3>
-              {viewingExerciseDetail.nameEn && (
-                <p className="text-xs text-[#6F7C76] dark:text-[#A8B8B1]">
-                  {viewingExerciseDetail.nameEn}
-                </p>
-              )}
+            <div className="flex items-center gap-3">
+              <ExerciseThumbnail
+                exerciseId={viewingExerciseDetail.id}
+                category={viewingExerciseDetail.category}
+                name={viewingExerciseDetail.name}
+                size="lg"
+                allowPreview={true}
+              />
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                  {viewingExerciseDetail.category} • {viewingExerciseDetail.equipment}
+                </span>
+                <h3 className="text-base font-black text-[#18201D] dark:text-white mt-0.5 truncate">
+                  {viewingExerciseDetail.name}
+                </h3>
+                {viewingExerciseDetail.nameEn && (
+                  <p className="text-xs text-[#6F7C76] dark:text-[#A8B8B1] truncate">
+                    {viewingExerciseDetail.nameEn}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="p-3 bg-[#F7F4EE] dark:bg-[#232D29] rounded-2xl">
@@ -556,7 +671,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
               <span className="text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] uppercase block mb-0.5">
                 Como Executar Corretamente
               </span>
-              <p className="text-xs text-[#3F4B46] dark:text-[#EDF2EF] leading-relaxed">
+              <p className="text-xs text-[#3F4B46] dark:text-[#EDF2EF] leading-relaxed max-h-36 overflow-y-auto">
                 {viewingExerciseDetail.instructions}
               </p>
             </div>
