@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { X, Key, CheckCircle2, AlertCircle, Loader2, User, LogIn, LogOut, ShieldCheck, Heart, KeyRound, Globe, Sparkles, Bot, Eye, EyeOff, Palette, Sun, Moon, Laptop, Check, Database, RefreshCw } from 'lucide-react';
+import { X, Key, CheckCircle2, AlertCircle, Loader2, User, LogIn, LogOut, ShieldCheck, Heart, KeyRound, Globe, Sparkles, Bot, Eye, EyeOff, Palette, Sun, Moon, Laptop, Check, Database } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { useTranslation, Language } from '../../services/i18n';
 import { testAIConnection } from '../../services/aiService';
 import { useTheme, PASTEL_COLORS, SecondaryColor, ThemeMode } from '../../services/themeService';
 import { FoodBudMascot } from '../pet/FoodBudMascot';
-import { isSupabaseConfigured, getSupabaseCredentials, testSupabaseConnection, saveSupabaseCredentials } from '../../services/supabaseClient';
+import { isSupabaseConfigured, getSupabaseCredentials, saveSupabaseCredentials } from '../../services/supabaseClient';
 
 interface SettingsModalProps {
   profile: UserProfile;
@@ -81,12 +81,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     });
   };
 
-  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
-  const [supabaseTestStatus, setSupabaseTestStatus] = useState<{
-    type: 'success' | 'warning' | 'error';
-    message: string;
-  } | null>(null);
-
   const supabaseConfigured = isSupabaseConfigured();
   const supabaseCreds = getSupabaseCredentials();
 
@@ -95,42 +89,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [manualKey, setManualKey] = useState(supabaseCreds.anonKey);
   const [manualSuccessMsg, setManualSuccessMsg] = useState<string | null>(null);
 
-  const handleTestSupabase = async () => {
-    setIsTestingSupabase(true);
-    setSupabaseTestStatus(null);
-    try {
-      const res = await testSupabaseConnection();
-      if (res.success) {
-        setSupabaseTestStatus({
-          type: 'success',
-          message: 'Banco conectado! Todas as 4 tabelas estão ativas e sincronizadas.'
-        });
-      } else if (res.missingTables && res.missingTables.length > 0) {
-        setSupabaseTestStatus({
-          type: 'warning',
-          message: `Conectou, mas faltam tabelas no banco: ${res.missingTables.join(', ')}. Execute o script supabase/schema.sql no SQL Editor do Supabase.`
-        });
-      } else {
-        setSupabaseTestStatus({
-          type: 'error',
-          message: res.message
-        });
-      }
-    } catch (err: any) {
-      setSupabaseTestStatus({
-        type: 'error',
-        message: err.message || 'Erro ao conectar ao Supabase.'
-      });
-    } finally {
-      setIsTestingSupabase(false);
-    }
-  };
-
   const handleSaveManualSupabase = () => {
     saveSupabaseCredentials(manualUrl, manualKey);
     setManualSuccessMsg('Credenciais salvas com sucesso!');
     setTimeout(() => setManualSuccessMsg(null), 3500);
-    handleTestSupabase();
   };
 
   const handleSaveAll = (e: React.FormEvent) => {
@@ -442,45 +404,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       : 'Nenhuma URL detectada'}
                   </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleTestSupabase}
-                  disabled={isTestingSupabase || !supabaseConfigured}
-                  className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg font-bold text-xs shrink-0 transition-colors disabled:opacity-50"
-                  style={{
-                    backgroundColor: isDark ? activeColor.darkBg : activeColor.bgTintLight,
-                    color: isDark ? activeColor.darkText : activeColor.textDark,
-                    border: `1px solid ${isDark ? activeColor.darkBorder : activeColor.border}`
-                  }}
-                >
-                  {isTestingSupabase ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3 h-3" />
-                  )}
-                  <span>Testar Conexão</span>
-                </button>
               </div>
-
-              {supabaseTestStatus && (
-                <div
-                  className={`p-2 rounded-lg text-[11px] leading-snug border flex items-start gap-1.5 ${
-                    supabaseTestStatus.type === 'success'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                      : supabaseTestStatus.type === 'warning'
-                      ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                  }`}
-                >
-                  {supabaseTestStatus.type === 'success' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  )}
-                  <span>{supabaseTestStatus.message}</span>
-                </div>
-              )}
 
               {!supabaseConfigured && (
                 <p className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] leading-relaxed">
