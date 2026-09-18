@@ -29,7 +29,7 @@ import {
   deleteWorkoutRoutine,
   getCompletedWorkouts
 } from '../../services/workoutService';
-import { searchExercises } from '../../services/exerciseDatabase';
+import { searchExercises, syncExercisesFromSupabase } from '../../services/exerciseDatabase';
 import { WorkoutExecutionView } from './WorkoutExecutionView';
 import { RoutineEditorModal } from './RoutineEditorModal';
 import { RoutineDetailModal } from './RoutineDetailModal';
@@ -79,7 +79,8 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
     try {
       const [loadedRoutines, loadedHistory] = await Promise.all([
         getWorkoutRoutines(profile.id),
-        getCompletedWorkouts(profile.id)
+        getCompletedWorkouts(profile.id),
+        syncExercisesFromSupabase()
       ]);
       setRoutines(loadedRoutines);
       setHistory(loadedHistory);
@@ -667,14 +668,43 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
               </span>
             </div>
 
+            {viewingExerciseDetail.secondaryMuscles && viewingExerciseDetail.secondaryMuscles.length > 0 && (
+              <div className="p-3 bg-[#F7F4EE] dark:bg-[#232D29] rounded-2xl">
+                <span className="text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] uppercase block mb-1.5">
+                  Músculos Secundários
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {viewingExerciseDetail.secondaryMuscles.map((sec, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 bg-white dark:bg-[#1E2623] border border-[#AEBDB5]/20 dark:border-[#394842] rounded-lg text-[10px] font-bold text-[#3F4B46] dark:text-[#EDF2EF]"
+                    >
+                      {sec}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="p-3 bg-[#F7F4EE] dark:bg-[#232D29] rounded-2xl">
               <span className="text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] uppercase block mb-0.5">
                 Como Executar Corretamente
               </span>
-              <p className="text-xs text-[#3F4B46] dark:text-[#EDF2EF] leading-relaxed max-h-36 overflow-y-auto">
+              <p className="text-xs text-[#3F4B46] dark:text-[#EDF2EF] leading-relaxed max-h-32 overflow-y-auto">
                 {viewingExerciseDetail.instructions}
               </p>
             </div>
+
+            {viewingExerciseDetail.tips && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase block mb-0.5">
+                  Dica Biomecânica do Coach
+                </span>
+                <p className="text-xs text-emerald-900 dark:text-emerald-200 leading-relaxed font-medium">
+                  {viewingExerciseDetail.tips}
+                </p>
+              </div>
+            )}
 
             <button
               onClick={() => setViewingExerciseDetail(null)}

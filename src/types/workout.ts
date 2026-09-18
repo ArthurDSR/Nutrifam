@@ -26,7 +26,10 @@ export interface Exercise {
   category: MuscleCategory;
   equipment: EquipmentType;
   targetMuscle: string;
+  secondaryMuscles?: string[];
   instructions: string;
+  tips?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
   gifUrl?: string;
   thumbnailUrl?: string;
   isCustom?: boolean;

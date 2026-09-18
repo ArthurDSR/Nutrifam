@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Dumbbell, Search, ChevronRight, Check } from 'lucide-react';
 import { WorkoutRoutine, RoutineExercise, MuscleCategory } from '../../types/workout';
 import { EXERCISE_DATABASE, searchExercises } from '../../services/exerciseDatabase';
+import { ExerciseThumbnail } from './ExerciseThumbnail';
 import { useTheme } from '../../services/themeService';
 
 interface RoutineEditorModalProps {
@@ -227,10 +228,17 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                     className="p-3.5 bg-[#F7F4EE] dark:bg-[#232D29] rounded-2xl border border-[#AEBDB5]/30 dark:border-[#394842] space-y-2.5"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-[#34423C] text-[10px] font-bold flex items-center justify-center text-[#18201D] dark:text-white">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-[#34423C] text-[10px] font-bold flex items-center justify-center text-[#18201D] dark:text-white shrink-0">
                           {idx + 1}
                         </span>
+                        <ExerciseThumbnail
+                          exerciseId={item.exerciseId}
+                          category={item.category}
+                          name={item.exerciseName}
+                          size="sm"
+                          allowPreview={true}
+                        />
                         <div>
                           <h4 className="text-xs font-bold text-[#18201D] dark:text-white">
                             {item.exerciseName}
@@ -395,21 +403,30 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                   onClick={() => handleAddExerciseFromPicker(item)}
                   className="p-3 bg-[#F7F4EE] dark:bg-[#232D29] hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-2xl cursor-pointer flex items-center justify-between border border-[#AEBDB5]/20 dark:border-[#394842] transition-colors"
                 >
-                  <div>
-                    <h4 className="text-xs font-bold text-[#18201D] dark:text-white">
-                      {item.name}
-                    </h4>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                        {MUSCLE_CATEGORY_LABELS[item.category]}
-                      </span>
-                      <span className="text-[10px] text-slate-400">•</span>
-                      <span className="text-[10px] text-slate-500">
-                        {item.targetMuscle}
-                      </span>
+                  <div className="flex items-center gap-3">
+                    <ExerciseThumbnail
+                      exerciseId={item.id}
+                      category={item.category}
+                      name={item.name}
+                      size="md"
+                      allowPreview={true}
+                    />
+                    <div>
+                      <h4 className="text-xs font-bold text-[#18201D] dark:text-white">
+                        {item.name}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                          {MUSCLE_CATEGORY_LABELS[item.category]}
+                        </span>
+                        <span className="text-[10px] text-slate-400">•</span>
+                        <span className="text-[10px] text-slate-500">
+                          {item.targetMuscle}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                 </div>
               ))}
             </div>

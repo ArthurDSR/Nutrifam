@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { UserProfile, DayLog, WeightEntry, FoodItem, WorkoutRoutine, CompletedWorkout } from '../types';
+import { UserProfile, DayLog, WeightEntry, FoodItem, WorkoutRoutine, CompletedWorkout, Exercise } from '../types';
 
 const STORAGE_URL_KEY = 'nutrifam_supabase_url';
 const STORAGE_KEY_KEY = 'nutrifam_supabase_anon_key';
@@ -809,4 +809,73 @@ export async function deleteCompletedWorkoutFromSupabase(workoutId: string, user
     return false;
   }
 }
+
+export async function loadExercisesFromSupabase(): Promise<Exercise[] | null> {
+  const client = getSupabase();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('exercises')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.warn('Error loading exercises from Supabase:', error);
+      return null;
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      nameEn: row.name_en || undefined,
+      category: row.category,
+      equipment: row.equipment,
+      targetMuscle: row.target_muscle,
+      secondaryMuscles: Array.isArray(row.secondary_muscles) ? row.secondary_muscles : [],
+      instructions: row.instructions,
+      tips: row.tips || '',
+      difficulty: row.difficulty || 'intermediate',
+      gifUrl: row.gif_url || '',
+      thumbnailUrl: row.thumbnail_url || row.gif_url || '',
+      isCustom: Boolean(row.is_custom)
+    }));
+  } catch (err) {
+    console.warn('Error loading exercises from Supabase:', err);
+    return null;
+  }
+}
+
+export async function saveCustomExerciseToSupabase(exercise: Exercise): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+
+  const targetId = await getActiveUserId();
+  if (!targetId) return false;
+
+  try {
+    const { error } = await client.from('exercises').upsert({
+      id: exercise.id,
+      name: exercise.name,
+      name_en: exercise.nameEn || null,
+      category: exercise.category,
+      equipment: exercise.equipment,
+      target_muscle: exercise.targetMuscle,
+      secondary_muscles: exercise.secondaryMuscles || [],
+      instructions: exercise.instructions,
+      tips: exercise.tips || '',
+      difficulty: exercise.difficulty || 'intermediate',
+      gif_url: exercise.gifUrl || '',
+      thumbnail_url: exercise.thumbnailUrl || exercise.gifUrl || '',
+      is_custom: true,
+      created_by: targetId
+    });
+
+    return !error;
+  } catch (err) {
+    console.warn('Error saving custom exercise to Supabase:', err);
+    return false;
+  }
+}
+
 
