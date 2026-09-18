@@ -12,9 +12,11 @@ import {
   Pencil
 } from 'lucide-react';
 import { useTheme } from '../../services/themeService';
+import { DayLog } from '../../types';
 import { FoodBudLandscape } from './FoodBudLandscape';
 import { FoodBudMascot } from './FoodBudMascot';
 import { SeasonalParticles } from './SeasonalParticles';
+import { QuestsView, calculateUnclaimedQuests } from '../quests/QuestsView';
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 export type TimeOfDay = 'day' | 'sunset' | 'night';
@@ -55,6 +57,8 @@ interface FoodBudViewProps {
   equippedGlasses?: string | null;
   equippedClothes?: string | null;
   petName?: string;
+  dayLog?: DayLog;
+  onClaimQuest?: (questId: string, rewardGems: number, rewardPetXp: number) => void;
   onSpendGems: (amount: number) => void;
   onUpdatePetProfile?: (updates: {
     inventory?: string[];
@@ -63,7 +67,6 @@ interface FoodBudViewProps {
     equippedClothes?: string | null;
     petName?: string;
   }) => void;
-  onNavigateToQuests?: () => void;
 }
 
 interface ShopItem {
@@ -86,9 +89,10 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
   equippedGlasses: propEquippedGlasses = null,
   equippedClothes: propEquippedClothes = null,
   petName: propPetName,
+  dayLog,
+  onClaimQuest,
   onSpendGems,
-  onUpdatePetProfile,
-  onNavigateToQuests
+  onUpdatePetProfile
 }) => {
   const { isDark, activeColor } = useTheme();
 
@@ -151,6 +155,10 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
   const [showShop, setShowShop] = useState(false);
   const [showItems, setShowItems] = useState(false);
   const [showSeasonModal, setShowSeasonModal] = useState(false);
+  const [showQuestsModal, setShowQuestsModal] = useState(false);
+
+  // Unclaimed Quests calculation for notification badge
+  const unclaimedQuestsCount = dayLog ? calculateUnclaimedQuests(dayLog) : 0;
 
   // Day/Night & Season States (Synchronized with local clock and Brazilian calendar)
   const [isAutoTime, setIsAutoTime] = useState(true);
@@ -818,17 +826,26 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
 
           {/* Right: Quests link + Gems balance + Weather/Season button */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {onNavigateToQuests && (
+            {/* Quests inside Pet screen */}
+            {dayLog && (
               <button
-                onClick={onNavigateToQuests}
-                className={`p-1.5 rounded-xl border transition-all active:scale-95 shadow-2xs ${
-                  isDark
+                onClick={() => setShowQuestsModal(true)}
+                className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border transition-all active:scale-95 shadow-2xs font-black text-xs ${
+                  unclaimedQuestsCount > 0
+                    ? 'bg-rose-500 text-white border-rose-600 shadow-md animate-pulse'
+                    : isDark
                     ? 'bg-[#18201D] text-amber-300 border-[#394842] hover:bg-[#20332D]'
                     : 'bg-[#F7F4EE] text-amber-700 border-[#AEBDB5]/30 hover:bg-[#ECEFE7]'
                 }`}
-                title="Ver Missões Diárias"
+                title="Missões Diárias do Pet"
               >
                 <Sparkles className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-bold">Missões</span>
+                {unclaimedQuestsCount > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-white text-rose-600 text-[9.5px] font-black leading-tight">
+                    {unclaimedQuestsCount}
+                  </span>
+                )}
               </button>
             )}
 
@@ -1675,6 +1692,42 @@ export const FoodBudView: React.FC<FoodBudViewProps> = ({
               >
                 Concluir
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quests Inside Pet Screen Modal */}
+      {showQuestsModal && dayLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-[#1E2623] rounded-3xl max-h-[90vh] flex flex-col shadow-2xl border border-[#AEBDB5]/20 dark:border-[#394842] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-[#AEBDB5]/20 dark:border-[#394842] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-black text-[#18201D] dark:text-white">
+                  Missões do FoodBud
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowQuestsModal(false)}
+                className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-[#6F7C76] dark:text-[#A8B8B1]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <QuestsView
+                dayLog={dayLog}
+                currentGems={gems}
+                petLevel={petLevel}
+                petXp={petXp}
+                petName={petName}
+                onClaimQuest={(qId, g, xp) => {
+                  if (onClaimQuest) {
+                    onClaimQuest(qId, g, xp);
+                  }
+                }}
+              />
             </div>
           </div>
         </div>

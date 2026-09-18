@@ -8,6 +8,7 @@ const translations = {
   pt: {
     // Navigation
     'nav.coach': 'Coach',
+    'nav.workouts': 'Treinos',
     'nav.journal': 'Diário',
     'nav.quests': 'Missões',
     'nav.foodbud': 'FoodBud',
@@ -232,6 +233,7 @@ const translations = {
   en: {
     // Navigation
     'nav.coach': 'Coach',
+    'nav.workouts': 'Workouts',
     'nav.journal': 'Journal',
     'nav.quests': 'Quests',
     'nav.foodbud': 'FoodBud',
@@ -456,6 +458,7 @@ const translations = {
   es: {
     // Navigation
     'nav.coach': 'Coach',
+    'nav.workouts': 'Entrenamientos',
     'nav.journal': 'Diario',
     'nav.quests': 'Misiones',
     'nav.foodbud': 'FoodBud',

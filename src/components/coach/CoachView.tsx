@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, Bot, User, Droplets, Flame, Scale } from 'lucide-react';
+import { Sparkles, Send, Bot, User, Droplets, Flame, Scale, Dumbbell, Check, BookmarkPlus } from 'lucide-react';
 import { UserProfile, DayLog } from '../../types';
-import { generateCoachAdvice, askCoachAI } from '../../services/aiService';
+import { WorkoutRoutine } from '../../types/workout';
+import { generateCoachAdvice, askCoachAI, CoachHistoryMessage } from '../../services/aiService';
+import { saveWorkoutRoutineToSupabase } from '../../services/supabaseClient';
 import { useTheme } from '../../services/themeService';
 
 interface CoachViewProps {
@@ -9,19 +11,51 @@ interface CoachViewProps {
   todayLog: DayLog;
   geminiApiKey?: string;
   onOpenScientificAssessment?: () => void;
+  onWorkoutRoutineCreated?: () => void;
 }
 
 interface Message {
   sender: 'ai' | 'user';
   text: string;
   time: string;
+  workoutProposal?: WorkoutRoutine;
+  isSavedToRoutines?: boolean;
+}
+
+/**
+ * Extracts any ```workout_proposal ... ``` code block from text and parses JSON
+ */
+function extractWorkoutProposal(text: string): { cleanText: string; proposal?: WorkoutRoutine } {
+  const match = text.match(/```workout_proposal\s*([\s\S]*?)\s*```/);
+  if (!match) return { cleanText: text };
+
+  try {
+    const jsonStr = match[1].trim();
+    const parsed = JSON.parse(jsonStr);
+    const proposal: WorkoutRoutine = {
+      id: `ai_routine_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title: parsed.title || 'Ficha Sugerida pelo Coach IA',
+      description: parsed.description || 'Treino montado sob medida pelo Coach IA',
+      category: parsed.category || 'custom',
+      exercises: Array.isArray(parsed.exercises) ? parsed.exercises : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const cleanText = text.replace(/```workout_proposal[\s\S]*?```/, '').trim();
+    return { cleanText, proposal };
+  } catch (err) {
+    console.warn('Failed to parse workout proposal JSON:', err);
+    return { cleanText: text };
+  }
 }
 
 export const CoachView: React.FC<CoachViewProps> = ({
   profile,
   todayLog,
   geminiApiKey,
-  onOpenScientificAssessment
+  onOpenScientificAssessment,
+  onWorkoutRoutineCreated
 }) => {
   const { isDark, activeColor } = useTheme();
   const effectiveProfile = geminiApiKey
@@ -34,15 +68,34 @@ export const CoachView: React.FC<CoachViewProps> = ({
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: 'ai',
-      text: `Olá ${profile.name}! Sou seu Coach Nutricional Inteligente. Acompanho seu objetivo de ${profile.goalType.toLowerCase()} e o consumo de calorias e macros em tempo real. Como posso te ajudar hoje?`,
+      text: `Olá ${profile.name}! Sou seu Coach Nutricional e Esportivo com IA. Acompanho suas calorias, macros e também posso montar suas fichas de treino sob medida, dar receitas fit e analisar seu progresso. Como posso te ajudar hoje?`,
       time: '08:50'
     }
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [savingRoutineId, setSavingRoutineId] = useState<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  const handleSaveProposalToRoutines = async (msgIndex: number, proposal: WorkoutRoutine) => {
+    setSavingRoutineId(proposal.id);
+    try {
+      await saveWorkoutRoutineToSupabase(proposal, profile.id);
+      setMessages((prev) =>
+        prev.map((m, idx) => (idx === msgIndex ? { ...m, isSavedToRoutines: true } : m))
+      );
+      if (onWorkoutRoutineCreated) {
+        onWorkoutRoutineCreated();
+      }
+    } catch (err) {
+      console.warn('Error saving AI routine:', err);
+      alert('Não foi possível salvar a ficha. Verifique sua conexão.');
+    } finally {
+      setSavingRoutineId(null);
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,28 +110,38 @@ export const CoachView: React.FC<CoachViewProps> = ({
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMessages((prev) => [...prev, newMsg]);
+    const nextMessages = [...messages, newMsg];
+    setMessages(nextMessages);
     setIsTyping(true);
 
-    // Call configured AI Provider (Gemini 2.5, OpenRouter Free, or OpenAI)
+    // Build multi-turn history payload for context
+    const historyPayload: CoachHistoryMessage[] = nextMessages.slice(-6).map((m) => ({
+      role: m.sender === 'user' ? 'user' : 'assistant',
+      content: m.text
+    }));
+
     setTimeout(async () => {
-      let reply = '';
+      let rawReply = '';
       try {
-        reply = await askCoachAI(userText, effectiveProfile, todayLog);
+        rawReply = await askCoachAI(userText, effectiveProfile, todayLog, historyPayload);
       } catch (err) {
         console.warn('Coach AI error:', err);
       }
 
-      if (!reply) {
-        reply = `Excelente pergunta, ${profile.name}! Para sustentar sua meta em ${profile.dailyCaloriesTarget} kcal, priorize hidratação adequada e ingestão consistente de proteínas em cada refeição.`;
+      if (!rawReply) {
+        rawReply = `Excelente pergunta, ${profile.name}! Para sustentar sua meta em ${profile.dailyCaloriesTarget} kcal, priorize hidratação adequada, ingestão consistente de proteínas em cada refeição e controle de porções de carboidratos refinados.`;
       }
+
+      const { cleanText, proposal } = extractWorkoutProposal(rawReply);
 
       setMessages((prev) => [
         ...prev,
         {
           sender: 'ai',
-          text: reply,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          text: cleanText,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          workoutProposal: proposal,
+          isSavedToRoutines: false
         }
       ]);
       setIsTyping(false);
@@ -107,7 +170,7 @@ export const CoachView: React.FC<CoachViewProps> = ({
                 NutriCoach IA
               </h2>
               <p className="text-[11px] font-semibold text-[#6F7C76] dark:text-[#A8B8B1]">
-                Análise diária personalizada
+                Treinos científicos, receitas & análise diária
               </p>
             </div>
           </div>
@@ -168,7 +231,7 @@ export const CoachView: React.FC<CoachViewProps> = ({
                 </div>
               )}
               <div
-                className={`max-w-[82%] rounded-2xl p-3 text-xs leading-relaxed shadow-2xs transition-colors ${
+                className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed shadow-2xs transition-colors ${
                   msg.sender === 'user'
                     ? 'rounded-tr-none border'
                     : 'bg-white dark:bg-[#232D29] text-[#3F4B46] dark:text-[#EDF2EF] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-tl-none font-medium'
@@ -183,9 +246,73 @@ export const CoachView: React.FC<CoachViewProps> = ({
                     : undefined
                 }
               >
-                <p>{msg.text}</p>
+                <p className="whitespace-pre-line">{msg.text}</p>
+
+                {/* Workout Proposal Interactive Card */}
+                {msg.workoutProposal && (
+                  <div className="mt-3 p-3 bg-[#F7F4EE] dark:bg-[#18201D] rounded-2xl border border-emerald-500/30 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                        <Dumbbell className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-[#18201D] dark:text-white leading-tight">
+                          {msg.workoutProposal.title}
+                        </h4>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase">
+                          Divisão {msg.workoutProposal.category}
+                        </span>
+                      </div>
+                    </div>
+
+                    {msg.workoutProposal.description && (
+                      <p className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1]">
+                        {msg.workoutProposal.description}
+                      </p>
+                    )}
+
+                    {/* Exercises snippet */}
+                    <div className="space-y-1 pt-1 border-t border-[#AEBDB5]/20 dark:border-[#394842]">
+                      {msg.workoutProposal.exercises.map((ex, exIdx) => (
+                        <div key={exIdx} className="flex items-center justify-between text-[10px]">
+                          <span className="font-semibold text-[#3F4B46] dark:text-[#EDF2EF] truncate max-w-[170px]">
+                            • {ex.exerciseName}
+                          </span>
+                          <span className="font-mono text-[#6F7C76] dark:text-[#A8B8B1]">
+                            {ex.targetSets}×{ex.targetReps}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Save Button */}
+                    <button
+                      type="button"
+                      disabled={msg.isSavedToRoutines || savingRoutineId === msg.workoutProposal.id}
+                      onClick={() => handleSaveProposalToRoutines(index, msg.workoutProposal!)}
+                      className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs ${
+                        msg.isSavedToRoutines
+                          ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                          : 'bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95'
+                      }`}
+                    >
+                      {msg.isSavedToRoutines ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          Salvo na sua Ficha de Treinos!
+                        </>
+                      ) : (
+                        <>
+                          <BookmarkPlus className="w-3.5 h-3.5" />
+                          Salvar na Minha Ficha de Treinos
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 <span
-                  className={`text-[9px] block text-right mt-1 font-mono ${
+                  className={`text-[9px] block text-right mt-1.5 font-mono ${
                     msg.sender === 'user'
                       ? 'text-[#6F7C76] dark:text-[#A8B8B1]'
                       : 'text-[#6F7C76] dark:text-[#A8B8B1]'
@@ -231,7 +358,7 @@ export const CoachView: React.FC<CoachViewProps> = ({
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Pergunte ao seu Coach IA..."
+            placeholder="Pergunte ao seu Coach (treinos, receitas, macros)..."
             className="w-full pl-4 pr-12 py-2.5 bg-[#F7F4EE] dark:bg-[#18201D] border border-[#AEBDB5]/40 dark:border-[#394842] rounded-full text-xs font-semibold text-[#3F4B46] dark:text-[#EDF2EF] placeholder-[#6F7C76]/70 dark:placeholder-[#A8B8B1]/60 focus:outline-none focus:border-[#5B8273] shadow-2xs"
           />
           <button

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, ScanLine, Search, Loader2, RefreshCw } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Camera, ScanLine, Search, Loader2, RefreshCw, CheckCircle2, Zap } from 'lucide-react';
 import { fetchProductByBarcode } from '../../services/openFoodFactsService';
 import { ProductEvaluation } from '../../types';
 import { useTheme } from '../../services/themeService';
@@ -14,20 +14,147 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [scannedSuccessCode, setScannedSuccessCode] = useState<string | null>(null);
+  const [torchEnabled, setTorchEnabled] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const isScanningRef = useRef<boolean>(false);
+  const lastScannedCodeRef = useRef<string | null>(null);
+  const lastScannedTimeRef = useRef<number>(0);
+
+  // Play audio beep on successful scan
+  const playSuccessBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1400, ctx.currentTime);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch {
+      // Audio not permitted or context unavailable
+    }
+  };
+
+  const handleLookup = useCallback(async (code: string) => {
+    const cleanCode = code.trim();
+    if (!cleanCode) return;
+
+    // Prevent re-scanning the same code within 3 seconds
+    const now = Date.now();
+    if (lastScannedCodeRef.current === cleanCode && now - lastScannedTimeRef.current < 3000) {
+      return;
+    }
+
+    lastScannedCodeRef.current = cleanCode;
+    lastScannedTimeRef.current = now;
+
+    // Play feedback
+    playSuccessBeep();
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(100);
+      } catch {}
+    }
+
+    setScannedSuccessCode(cleanCode);
+    setIsLoading(true);
+
+    try {
+      const product = await fetchProductByBarcode(cleanCode);
+      onProductFound(product);
+    } catch (err: any) {
+      alert(err.message || `Produto com código "${cleanCode}" não encontrado na base de alimentos.`);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => {
+        setScannedSuccessCode(null);
+      }, 2000);
+    }
+  }, [onProductFound]);
+
+  // Continuous scanning loop using native BarcodeDetector API
+  const startDetectionLoop = useCallback(() => {
+    const BarcodeDetectorClass = (window as any).BarcodeDetector;
+
+    let detector: any = null;
+    if (BarcodeDetectorClass) {
+      try {
+        detector = new BarcodeDetectorClass({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code']
+        });
+      } catch (err) {
+        console.warn('BarcodeDetector instantiation failed:', err);
+      }
+    }
+
+    let scanInterval: any = null;
+
+    if (detector) {
+      scanInterval = setInterval(async () => {
+        if (!videoRef.current || videoRef.current.readyState < 2 || isScanningRef.current) {
+          return;
+        }
+
+        try {
+          isScanningRef.current = true;
+          const barcodes = await detector.detect(videoRef.current);
+          if (barcodes && barcodes.length > 0) {
+            const rawValue = barcodes[0].rawValue;
+            if (rawValue && rawValue !== lastScannedCodeRef.current) {
+              handleLookup(rawValue);
+            }
+          }
+        } catch {
+          // Frame detection dropped
+        } finally {
+          isScanningRef.current = false;
+        }
+      }, 200);
+    }
+
+    return () => {
+      if (scanInterval) clearInterval(scanInterval);
+    };
+  }, [handleLookup]);
 
   const startCamera = async () => {
     setCameraError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+
+      // Check if torch/flashlight is supported
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities?.() as any;
+      if (capabilities && capabilities.torch) {
+        setTorchSupported(true);
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.setAttribute('playsinline', 'true');
+        await videoRef.current.play();
       }
+
       setIsCameraActive(true);
     } catch (err: any) {
       console.warn('Camera access error:', err);
@@ -37,11 +164,31 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
   };
 
   const stopCamera = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     setIsCameraActive(false);
+  };
+
+  const toggleTorch = async () => {
+    if (!streamRef.current) return;
+    const track = streamRef.current.getVideoTracks()[0];
+    if (track) {
+      try {
+        const nextState = !torchEnabled;
+        await (track as any).applyConstraints({
+          advanced: [{ torch: nextState }]
+        });
+        setTorchEnabled(nextState);
+      } catch (err) {
+        console.warn('Error toggling flashlight:', err);
+      }
+    }
   };
 
   useEffect(() => {
@@ -51,18 +198,12 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
     };
   }, []);
 
-  const handleLookup = async (code: string) => {
-    if (!code.trim()) return;
-    setIsLoading(true);
-    try {
-      const product = await fetchProductByBarcode(code.trim());
-      onProductFound(product);
-    } catch (err: any) {
-      alert(err.message || 'Erro ao buscar código de barras.');
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (isCameraActive) {
+      const cleanup = startDetectionLoop();
+      return cleanup;
     }
-  };
+  }, [isCameraActive, startDetectionLoop]);
 
   // Sample quick barcodes
   const sampleBarcodes = [
@@ -77,14 +218,29 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
       {/* Viewfinder Frame */}
-      <div className="relative w-full h-56 bg-slate-900 rounded-3xl overflow-hidden shadow-inner flex flex-col items-center justify-center border border-[#AEBDB5]/30 dark:border-[#394842]">
+      <div className="relative w-full h-64 bg-slate-950 rounded-3xl overflow-hidden shadow-inner flex flex-col items-center justify-center border border-[#AEBDB5]/30 dark:border-[#394842]">
         {isCameraActive ? (
-          <video
-            ref={videoRef}
-            className="w-full h-full object-cover"
-            playsInline
-            muted
-          />
+          <>
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              playsInline
+              muted
+              autoPlay
+            />
+            {/* Flashlight toggle if supported */}
+            {torchSupported && (
+              <button
+                onClick={toggleTorch}
+                className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-colors ${
+                  torchEnabled ? 'bg-amber-400 text-slate-900' : 'bg-black/50 text-white hover:bg-black/70'
+                }`}
+                title="Alternar Lanterna"
+              >
+                <Zap className="w-4 h-4" />
+              </button>
+            )}
+          </>
         ) : (
           <div className="text-center p-4">
             <Camera className="w-10 h-10 text-slate-500 mx-auto mb-2" />
@@ -103,21 +259,43 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
           </div>
         )}
 
-        {/* Scan Frame Overlay */}
+        {/* Scan Target Reticle */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div
-            className="w-64 h-32 border-2 rounded-2xl relative shadow-lg"
-            style={{ borderColor: activeColor.primary }}
+            className={`w-64 h-36 border-2 rounded-2xl relative transition-all duration-300 ${
+              scannedSuccessCode ? 'border-emerald-500 bg-emerald-500/20 scale-105' : ''
+            }`}
+            style={{ borderColor: scannedSuccessCode ? '#10b981' : activeColor.primary }}
           >
-            <div
-              className="absolute top-0 left-0 right-0 h-0.5 animate-bounce opacity-80"
-              style={{ backgroundColor: activeColor.primary }}
-            />
-            <div className="absolute inset-x-0 bottom-2 text-center text-[10px] font-bold text-white/90 drop-shadow">
-              Aponte para o código de barras
-            </div>
+            {/* Animated scan laser */}
+            {!scannedSuccessCode && (
+              <div
+                className="absolute top-0 left-0 right-0 h-0.5 animate-bounce opacity-90 shadow-sm"
+                style={{ backgroundColor: activeColor.primary }}
+              />
+            )}
+
+            {scannedSuccessCode ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-emerald-400">
+                <CheckCircle2 className="w-8 h-8 animate-pulse mb-1" />
+                <span className="text-xs font-bold font-mono text-white bg-black/60 px-2 py-0.5 rounded-full">
+                  {scannedSuccessCode}
+                </span>
+              </div>
+            ) : (
+              <div className="absolute inset-x-0 bottom-2 text-center text-[10px] font-bold text-white/90 drop-shadow">
+                Posicione o código de barras no centro
+              </div>
+            )}
           </div>
         </div>
+
+        {isLoading && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white">
+            <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+            <span className="text-xs font-semibold">Consultando produto...</span>
+          </div>
+        )}
       </div>
 
       {/* Manual Input */}

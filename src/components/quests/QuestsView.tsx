@@ -24,6 +24,36 @@ interface Quest {
   isClaimed: boolean;
 }
 
+export function calculateUnclaimedQuests(dayLog?: DayLog): number {
+  if (!dayLog) return 0;
+  const claimedIds = dayLog.claimedQuestIds || [];
+  let count = 0;
+
+  if (dayLog.water && dayLog.water.consumedLiters >= dayLog.water.targetLiters && !claimedIds.includes('q_water')) {
+    count++;
+  }
+  if (
+    dayLog.meals &&
+    dayLog.meals.breakfast?.items?.length > 0 &&
+    dayLog.meals.lunch?.items?.length > 0 &&
+    !claimedIds.includes('q_meals')
+  ) {
+    count++;
+  }
+  if (
+    dayLog.fasting &&
+    dayLog.fasting.elapsedSeconds >= (dayLog.fasting.targetHours * 3600) &&
+    !claimedIds.includes('q_fast')
+  ) {
+    count++;
+  }
+  if (dayLog.activities && dayLog.activities.length > 0 && !claimedIds.includes('q_activity')) {
+    count++;
+  }
+
+  return count;
+}
+
 export const QuestsView: React.FC<QuestsViewProps> = ({
   dayLog,
   currentGems,

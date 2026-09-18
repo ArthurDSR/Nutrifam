@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { UserProfile, DayLog, WeightEntry, FoodItem } from '../types';
+import { UserProfile, DayLog, WeightEntry, FoodItem, WorkoutRoutine, CompletedWorkout } from '../types';
 
 const STORAGE_URL_KEY = 'nutrifam_supabase_url';
 const STORAGE_KEY_KEY = 'nutrifam_supabase_anon_key';
@@ -630,3 +630,183 @@ export async function syncAllLocalDataToSupabase(
     return { success: false, message: `Erro na sincronização: ${err.message || err}` };
   }
 }
+
+// --------------------------------------------------------------------------------
+// Workouts CRUD (Routines & Completed Workouts)
+// --------------------------------------------------------------------------------
+export async function loadWorkoutRoutinesFromSupabase(userId?: string): Promise<WorkoutRoutine[] | null> {
+  const client = getSupabase();
+  if (!client) return null;
+
+  const targetId = userId || await getActiveUserId();
+  if (!targetId) return null;
+
+  try {
+    const { data, error } = await client
+      .from('workout_routines')
+      .select('*')
+      .eq('user_id', targetId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Error loading workout routines:', error);
+      return null;
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      title: row.title,
+      description: row.description || '',
+      category: row.category || 'custom',
+      exercises: Array.isArray(row.exercises) ? row.exercises : [],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  } catch (err) {
+    console.warn('Error loading workout routines from Supabase:', err);
+    return null;
+  }
+}
+
+export async function saveWorkoutRoutineToSupabase(routine: WorkoutRoutine, userId?: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+
+  const targetId = userId || routine.userId || await getActiveUserId();
+  if (!targetId) return false;
+
+  try {
+    const { error } = await client.from('workout_routines').upsert({
+      id: routine.id,
+      user_id: targetId,
+      title: routine.title,
+      description: routine.description || '',
+      category: routine.category || 'custom',
+      exercises: routine.exercises || [],
+      created_at: routine.createdAt || new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+
+    return !error;
+  } catch (err) {
+    console.warn('Error saving workout routine to Supabase:', err);
+    return false;
+  }
+}
+
+export async function deleteWorkoutRoutineFromSupabase(routineId: string, userId?: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+
+  const targetId = userId || await getActiveUserId();
+  if (!targetId) return false;
+
+  try {
+    const { error } = await client
+      .from('workout_routines')
+      .delete()
+      .eq('id', routineId)
+      .eq('user_id', targetId);
+
+    return !error;
+  } catch (err) {
+    console.warn('Error deleting workout routine from Supabase:', err);
+    return false;
+  }
+}
+
+export async function loadCompletedWorkoutsFromSupabase(userId?: string): Promise<CompletedWorkout[] | null> {
+  const client = getSupabase();
+  if (!client) return null;
+
+  const targetId = userId || await getActiveUserId();
+  if (!targetId) return null;
+
+  try {
+    const { data, error } = await client
+      .from('completed_workouts')
+      .select('*')
+      .eq('user_id', targetId)
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.warn('Error loading completed workouts:', error);
+      return null;
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      routineId: row.routine_id,
+      title: row.title,
+      date: row.date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      durationMinutes: Number(row.duration_minutes) || 0,
+      totalVolumeKg: Number(row.total_volume_kg) || 0,
+      totalSets: Number(row.total_sets) || 0,
+      caloriesBurned: Number(row.calories_burned) || 0,
+      exercises: Array.isArray(row.exercises) ? row.exercises : [],
+      notes: row.notes || '',
+      createdAt: row.created_at
+    }));
+  } catch (err) {
+    console.warn('Error loading completed workouts from Supabase:', err);
+    return null;
+  }
+}
+
+export async function saveCompletedWorkoutToSupabase(workout: CompletedWorkout, userId?: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+
+  const targetId = userId || workout.userId || await getActiveUserId();
+  if (!targetId) return false;
+
+  try {
+    const { error } = await client.from('completed_workouts').upsert({
+      id: workout.id,
+      user_id: targetId,
+      routine_id: workout.routineId || null,
+      title: workout.title,
+      date: workout.date,
+      start_time: workout.startTime,
+      end_time: workout.endTime,
+      duration_minutes: workout.durationMinutes,
+      total_volume_kg: workout.totalVolumeKg,
+      total_sets: workout.totalSets,
+      calories_burned: workout.caloriesBurned,
+      exercises: workout.exercises || [],
+      notes: workout.notes || '',
+      created_at: workout.createdAt || new Date().toISOString()
+    });
+
+    return !error;
+  } catch (err) {
+    console.warn('Error saving completed workout to Supabase:', err);
+    return false;
+  }
+}
+
+export async function deleteCompletedWorkoutFromSupabase(workoutId: string, userId?: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+
+  const targetId = userId || await getActiveUserId();
+  if (!targetId) return false;
+
+  try {
+    const { error } = await client
+      .from('completed_workouts')
+      .delete()
+      .eq('id', workoutId)
+      .eq('user_id', targetId);
+
+    return !error;
+  } catch (err) {
+    console.warn('Error deleting completed workout from Supabase:', err);
+    return false;
+  }
+}
+

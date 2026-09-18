@@ -940,25 +940,73 @@ export function generateCoachAdvice(todayLog: DayLog, profile: UserProfile): {
  * Interactive Coach chat with configured AI Provider (Gemini, OpenRouter or OpenAI)
  * Falls back gracefully to heuristic nutritionist responses if no key or error occurs.
  */
+export interface CoachHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * Interactive Coach chat with configured AI Provider (Gemini, OpenRouter or OpenAI)
+ * Supports multi-turn history, anti-hallucination scientific boundaries,
+ * workout proposal generation with structured JSON, and varied heuristic fallbacks.
+ */
 export async function askCoachAI(
   userMessage: string,
   profile: UserProfile,
-  todayLog: DayLog
+  todayLog: DayLog,
+  history: CoachHistoryMessage[] = []
 ): Promise<string> {
   const provider = profile.aiProvider || 'gemini';
-  const systemPrompt = `Você é um nutricionista esportivo amigável, motivador, acolhedor e científico do aplicativo NutriFam.
-O usuário se chama ${profile.name}, pesa ${profile.currentWeightKg}kg, tem meta de ${profile.goalWeightKg}kg e limite de ${profile.dailyCaloriesTarget} kcal/dia.
-Hoje ele consumiu aproximadamente ${Object.values(todayLog.meals).reduce(
+
+  const consumedCalories = Object.values(todayLog.meals).reduce(
     (acc, meal) => acc + meal.items.reduce((mAcc, i) => mAcc + i.calories * i.servingsCount, 0),
     0
-  )} kcal e bebeu ${todayLog.water.consumedLiters}L de água.
-O usuário perguntou: "${userMessage}".
-Responda em português com conselhos práticos, empáticos e diretos em 2 a 3 frases.`;
+  );
+
+  const systemPrompt = `Você é o Coach Esportivo e Nutricional do aplicativo NutriFam.
+Suas respostas devem ser científicas, acolhedoras, objetivas e práticas (baseadas no ACSM, ISSN e SBAN).
+NÃO ALUCINE: Nunca invente dados que o usuário não forneceu. Se faltar informação relevante, peça educadamente.
+
+DADOS DO USUÁRIO:
+- Nome: ${profile.name}
+- Peso Atual: ${profile.currentWeightKg} kg | Meta: ${profile.goalWeightKg} kg | Objetivo: ${profile.goalType}
+- Meta Diária: ${profile.dailyCaloriesTarget} kcal (Proteína: ${profile.targetMacros.proteinGrams}g, Carboidrato: ${profile.targetMacros.carbsGrams}g, Gordura: ${profile.targetMacros.fatGrams}g)
+- Hoje consumiu: ${consumedCalories} kcal | Água: ${todayLog.water.consumedLiters}L
+
+DIRETRIZES DE RESPOSTA:
+1. Responda em português claro, empático e encorajador.
+2. Seja conciso e direto. Varie suas respostas conforme o que o usuário perguntou.
+3. Se o usuário pedir DICAS DE RECEITAS ou ideias de refeição: forneça receitas reais e práticas com ingredientes acessíveis, porções e macros aproximados.
+4. Se o usuário pedir para MONTAR UM TREINO ou fichas de exercícios: elabore a sugestão explicativa e adicione no final da mensagem OBRIGATORIAMENTE o bloco estruturado exatamente assim:
+\`\`\`workout_proposal
+{
+  "title": "Nome do Treino (ex: Treino A - Peitoral e Tríceps)",
+  "description": "Foco em hipertrofia e estímulo mecânico",
+  "category": "push",
+  "exercises": [
+    {
+      "exerciseId": "chest_bench_press_barbell",
+      "exerciseName": "Supino Reto com Barra",
+      "category": "chest",
+      "targetSets": 4,
+      "targetReps": "8-10",
+      "restSeconds": 90
+    }
+  ]
+}
+\`\`\`
+Valores aceitos para category: "push", "pull", "legs", "upper", "lower", "fullbody", "custom".`;
 
   // 1. OpenRouter
   if (provider === 'openrouter' && profile.openrouterApiKey?.trim()) {
     try {
       const targetModel = profile.openrouterModel || 'openrouter/free';
+      const messagesPayload = [
+        { role: 'system', content: systemPrompt },
+        ...history.map((h) => ({ role: h.role, content: h.content })),
+        { role: 'user', content: userMessage }
+      ];
+
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -969,11 +1017,8 @@ Responda em português com conselhos práticos, empáticos e diretos em 2 a 3 fr
         },
         body: JSON.stringify({
           model: targetModel,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage }
-          ],
-          max_tokens: 300
+          messages: messagesPayload,
+          max_tokens: 600
         })
       });
       if (res.ok) {
@@ -989,6 +1034,12 @@ Responda em português com conselhos práticos, empáticos e diretos em 2 a 3 fr
   // 2. OpenAI
   if (provider === 'openai' && profile.openaiApiKey?.trim()) {
     try {
+      const messagesPayload = [
+        { role: 'system', content: systemPrompt },
+        ...history.map((h) => ({ role: h.role, content: h.content })),
+        { role: 'user', content: userMessage }
+      ];
+
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -997,11 +1048,8 @@ Responda em português com conselhos práticos, empáticos e diretos em 2 a 3 fr
         },
         body: JSON.stringify({
           model: profile.openaiModel || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage }
-          ],
-          max_tokens: 300
+          messages: messagesPayload,
+          max_tokens: 600
         })
       });
       if (res.ok) {
@@ -1017,11 +1065,16 @@ Responda em português com conselhos práticos, empáticos e diretos em 2 a 3 fr
   // 3. Google Gemini
   if (provider === 'gemini' && profile.geminiApiKey?.trim()) {
     try {
+      const contentsPayload = [
+        {
+          role: 'user',
+          parts: [{ text: `${systemPrompt}\n\nHistórico da conversa:\n${history.map((h) => `${h.role}: ${h.content}`).join('\n')}\n\nNova pergunta do usuário: ${userMessage}` }]
+        }
+      ];
+
       const res = await callGeminiApi(
         profile.geminiApiKey.trim(),
-        {
-          contents: [{ parts: [{ text: `${systemPrompt}\n\nPergunta do usuário: ${userMessage}` }] }]
-        },
+        { contents: contentsPayload },
         profile.geminiModel || 'gemini-3.5-flash-lite'
       );
       if (res.ok) {
@@ -1034,16 +1087,233 @@ Responda em português com conselhos práticos, empáticos e diretos em 2 a 3 fr
     }
   }
 
-  // 4. Contextual heuristics fallback
+  // 4. Enhanced Contextual Heuristics Fallback (Rich, varied, anti-repetition)
   const lower = userMessage.toLowerCase();
+
+  // Workout Generation Intent
+  if (
+    lower.includes('treino') ||
+    lower.includes('ficha') ||
+    lower.includes('musculação') ||
+    lower.includes('exercício') ||
+    lower.includes('push') ||
+    lower.includes('pull') ||
+    lower.includes('legs')
+  ) {
+    if (lower.includes('costas') || lower.includes('pull') || lower.includes('biceps') || lower.includes('bíceps')) {
+      return `Aqui está uma excelente periodização para Dorsais e Bíceps focada em hipertrofia e amplitude completa! Descanse de 60 a 90 segundos entre as séries para recuperação adequada do ATP muscular.
+
+\`\`\`workout_proposal
+{
+  "title": "Treino B - Dorsais & Bíceps (Pull)",
+  "description": "Foco em largura e espessura das costas com pico de contração em bíceps",
+  "category": "pull",
+  "exercises": [
+    {
+      "exerciseId": "back_lat_pulldown_wide",
+      "exerciseName": "Puxada Frontal Aberta (Pulldown)",
+      "category": "back",
+      "targetSets": 4,
+      "targetReps": "8-10",
+      "restSeconds": 90
+    },
+    {
+      "exerciseId": "back_barbell_bent_over_row",
+      "exerciseName": "Remada Curvada com Barra",
+      "category": "back",
+      "targetSets": 4,
+      "targetReps": "8-10",
+      "restSeconds": 90
+    },
+    {
+      "exerciseId": "shoulders_face_pull",
+      "exerciseName": "Face Pull na Polia",
+      "category": "shoulders",
+      "targetSets": 3,
+      "targetReps": "12-15",
+      "restSeconds": 60
+    },
+    {
+      "exerciseId": "biceps_barbell_curl",
+      "exerciseName": "Rosca Direta com Barra",
+      "category": "biceps",
+      "targetSets": 3,
+      "targetReps": "10-12",
+      "restSeconds": 60
+    },
+    {
+      "exerciseId": "biceps_hammer_curl",
+      "exerciseName": "Rosca Martelo com Halteres",
+      "category": "biceps",
+      "targetSets": 3,
+      "targetReps": "10-12",
+      "restSeconds": 60
+    }
+  ]
+}
+\`\`\`
+Você pode salvar essa ficha clicando no botão abaixo!`;
+    }
+
+    if (lower.includes('perna') || lower.includes('legs') || lower.includes('gluteo') || lower.includes('quadriceps')) {
+      return `Excelente iniciativa! Treinar pernas com intensidade gera alta demanda metabólica e queima calórica prolongada (EPOC). Preparei esta rotina completa:
+
+\`\`\`workout_proposal
+{
+  "title": "Treino C - Pernas Completo (Legs)",
+  "description": "Estímulo equilibrado em quadríceps, posteriores e panturrilhas",
+  "category": "legs",
+  "exercises": [
+    {
+      "exerciseId": "legs_barbell_squat",
+      "exerciseName": "Agachamento Livre com Barra",
+      "category": "legs",
+      "targetSets": 4,
+      "targetReps": "8-10",
+      "restSeconds": 120
+    },
+    {
+      "exerciseId": "legs_leg_press_45",
+      "exerciseName": "Leg Press 45°",
+      "category": "legs",
+      "targetSets": 3,
+      "targetReps": "10-12",
+      "restSeconds": 90
+    },
+    {
+      "exerciseId": "legs_romanian_deadlift",
+      "exerciseName": "Stiff / Levantamento Romeno (RDL)",
+      "category": "legs",
+      "targetSets": 3,
+      "targetReps": "10-12",
+      "restSeconds": 90
+    },
+    {
+      "exerciseId": "calves_standing_raise_machine",
+      "exerciseName": "Panturrilha em Pé na Máquina",
+      "category": "calves",
+      "targetSets": 4,
+      "targetReps": "15-20",
+      "restSeconds": 60
+    }
+  ]
+}
+\`\`\`
+Clique abaixo para salvar diretamente na sua área de treinos!`;
+    }
+
+    // Default Push routine
+    return `Montei uma ficha de treino clássica e eficiente de Push (Peitoral, Ombros e Tríceps), ideal para progressão de cargas sem sobrecarregar as articulações:
+
+\`\`\`workout_proposal
+{
+  "title": "Treino A - Peitoral, Ombros & Tríceps (Push)",
+  "description": "Foco em empurrar com sobrecarga progressiva em exercícios compostos",
+  "category": "push",
+  "exercises": [
+    {
+      "exerciseId": "chest_bench_press_barbell",
+      "exerciseName": "Supino Reto com Barra",
+      "category": "chest",
+      "targetSets": 4,
+      "targetReps": "8-10",
+      "restSeconds": 90
+    },
+    {
+      "exerciseId": "chest_incline_bench_press_dumbbell",
+      "exerciseName": "Supino Inclinado com Halteres",
+      "category": "chest",
+      "targetSets": 3,
+      "targetReps": "10-12",
+      "restSeconds": 75
+    },
+    {
+      "exerciseId": "shoulders_dumbbell_shoulder_press",
+      "exerciseName": "Desenvolvimento com Halteres",
+      "category": "shoulders",
+      "targetSets": 3,
+      "targetReps": "10-12",
+      "restSeconds": 75
+    },
+    {
+      "exerciseId": "shoulders_lateral_raise_dumbbell",
+      "exerciseName": "Elevação Lateral com Halteres",
+      "category": "shoulders",
+      "targetSets": 4,
+      "targetReps": "12-15",
+      "restSeconds": 60
+    },
+    {
+      "exerciseId": "triceps_rope_pushdown",
+      "exerciseName": "Tríceps Corda na Polia",
+      "category": "triceps",
+      "targetSets": 3,
+      "targetReps": "12-15",
+      "restSeconds": 60
+    }
+  ]
+}
+\`\`\`
+Deseja salvar essa ficha na sua lista de treinos?`;
+  }
+
+  // Recipes Intent
+  if (lower.includes('receita') || lower.includes('cozinhar') || lower.includes('preparar') || lower.includes('lanche')) {
+    if (lower.includes('doce') || lower.includes('sobremesa') || lower.includes('banana')) {
+      return `Aqui está uma receita incrível de **Panqueca Fit de Banana com Aveia e Canela**:
+- 1 banana madura amassada
+- 2 ovos inteiros
+- 2 colheres de sopa de farinha ou farelo de aveia (30g)
+- 1 pitada de canela em pó
+
+Misture tudo com um garfo e doure em frigideira antiaderente levemente untada.
+Macros estimados: ~280 kcal | 15g proteína | 35g carbo | 9g gordura. Saciedade alta e zero açúcar adicionado!`;
+    }
+
+    if (lower.includes('proteico') || lower.includes('proteína') || lower.includes('pos treino') || lower.includes('pós-treino')) {
+      return `Experimente este **Creme Proteico de Frutas Vermelhas**:
+- 1 pote de iogurte natural desnatado (160g)
+- 1 scoop (30g) de Whey Protein de baunilha ou morango
+- 50g de morangos picados ou frutas vermelhas
+- 1 colher de sopa de sementes de chia
+
+Misture o iogurte e o whey até ficar homogêneo e finalize com as frutas.
+Macros: ~220 kcal | 32g proteína | 14g carbo | 3g gordura. Perfeito para síntese proteica muscular!`;
+    }
+
+    return `Uma das melhores refeições práticas para sua meta é o **Omelete Rápido NutriFam**:
+- 3 ovos (2 claras e 1 gema para equilibrar gorduras)
+- 2 colheres de sopa de queijo cottage ou ricota
+- Tomate cereja e orégano a gosto
+
+Bata os ovos com garfo, coloque na frigideira em fogo baixo, adicione o queijo e feche como uma meia-lua.
+Macros: ~210 kcal | 22g proteína | 3g carbo | 12g gordura boa.`;
+  }
+
+  // Supplements Intent
+  if (lower.includes('creatina') || lower.includes('whey') || lower.includes('suplement')) {
+    if (lower.includes('creatina')) {
+      return `A **Creatina Monoidratada** é o suplemento com maior comprovação científica do mundo. Ela atua na regeneração rápida de ATP celular, aumentando força e hipertrofia. A recomendação padrão é de 3g a 5g todos os dias (inclusive nos dias sem treino), consumida preferencialmente com uma fonte de carboidrato para otimizar a absorção.`;
+    }
+    return `O **Whey Protein** é basicamente uma proteína de altíssimo valor biológico extraída do soro do leite. Ele não tem nada de "mágico", mas é uma ferramenta imbatível de conveniência para bater seus ${profile.targetMacros.proteinGrams}g diários sem ter que preparar carne ou ovos toda hora!`;
+  }
+
+  // Specific Diets & Fasting
+  if (lower.includes('jejum') || lower.includes('fasting')) {
+    return `O jejum intermitente é uma ferramenta válida para controle de janelas alimentares, mas o que determina a perda de peso real é o balanço energético total (déficit calórico). O mais importante é garantir que na sua janela de alimentação você atinja seus ${profile.targetMacros.proteinGrams}g de proteína para preservar sua massa magra.`;
+  }
+
+  // Evening / Dinner
   if (lower.includes('jantar') || lower.includes('noite') || lower.includes('dinner')) {
-    return `Para o jantar, uma excelente opção com alta saciedade e poucas calorias é filé de peito de frango grelhado (150g) com salada farta de folhas verdes e brócolis cozido no vapor. Isso garante ~45g de proteína mantendo o déficit calórico!`;
+    return `Para o jantar, uma combinação impecável com alta saciedade e poucas calorias é filé de frango grelhado (150g) acompanhado de salada verde colorida e uma porção moderada de abóbora cabotiá ou batata cozida. Isso fornece ~40g de proteína sem estourar as calorias antes de dormir.`;
   }
-  if (lower.includes('proteina') || lower.includes('proteína') || lower.includes('protein')) {
-    return `Para bater seus ${profile.targetMacros.proteinGrams}g de proteína diários, inclua fontes magras como ovos mexidos, peito de frango, atum, iogurte natural desnatado ou uma dose de Whey Protein após o treino.`;
-  }
-  if (lower.includes('fome') || lower.includes('apetite') || lower.includes('doce')) {
-    return `A vontade de comer doces costuma estar ligada a sede ou queda rápida de energia. Beba 300ml de água gelada primeiro e, se persistir, aposte em chocolate 70%+ com moderação ou maçã polvilhada com canela!`;
-  }
-  return `Excelente pergunta, ${profile.name}! Para sustentar sua meta em ${profile.dailyCaloriesTarget} kcal, priorize hidratação adequada, ingestão consistente de proteínas em cada refeição e controle de porções de carboidratos refinados.`;
+
+  // General Adaptive Motivation
+  const tips = [
+    `Para alcançar seus ${profile.goalWeightKg} kg de forma consistente, a regularidade vence a perfeição. Mantenha os treinos anotados e procure progredir 1 repetição ou 1 kg a cada semana!`,
+    `Lembre-se que cada grama de proteína ajuda a preservar a massa magra durante o emagrecimento e eleva a queima energética pela termogênese dos alimentos (TEF). Você já está no caminho certo!`,
+    `Hoje você já registrou ${consumedCalories} kcal das suas ${profile.dailyCaloriesTarget} kcal diárias. Se sentir fome entre as refeições, frutas com casca ou vegetais crus são seus maiores aliados em volume com baixa densidade calórica.`
+  ];
+
+  return tips[Math.floor(Math.random() * tips.length)];
 }

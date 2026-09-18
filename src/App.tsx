@@ -17,8 +17,9 @@ import { NutritionTab } from './components/profile/NutritionTab';
 import { AddWeightModal } from './components/profile/AddWeightModal';
 import { EditProfileModal } from './components/profile/EditProfileModal';
 import { CoachView } from './components/coach/CoachView';
-import { QuestsView } from './components/quests/QuestsView';
+import { calculateUnclaimedQuests } from './components/quests/QuestsView';
 import { FoodBudView } from './components/pet/FoodBudView';
+import { WorkoutsView } from './components/workout/WorkoutsView';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { ScientificAssessmentModal } from './components/modals/ScientificAssessmentModal';
 import { AuthModal } from './components/auth/AuthModal';
@@ -973,29 +974,44 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: COACH (AI Assistant) */}
+        {/* TAB: COACH (AI Assistant) */}
         {activeTab === 'coach' && (
           <CoachView
             profile={profile}
             todayLog={currentDayLog}
             geminiApiKey={profile.geminiApiKey}
             onOpenScientificAssessment={() => setIsScientificAssessmentOpen(true)}
+            onWorkoutRoutineCreated={() => setActiveTab('workouts')}
           />
         )}
 
-        {/* TAB 4: QUESTS (Gamified challenges) */}
+        {/* TAB: WORKOUTS (Fichas, Séries, Hevy-style tracking) */}
+        {activeTab === 'workouts' && (
+          <WorkoutsView
+            profile={profile}
+            onUpdateProfile={(updates) => setProfile((p) => ({ ...p, ...updates }))}
+          />
+        )}
+
+        {/* TAB: QUESTS (Redirects/fallback to Pet area) */}
         {activeTab === 'quests' && (
-          <QuestsView
-            dayLog={currentDayLog}
-            currentGems={profile.gems}
+          <FoodBudView
+            gems={profile.gems}
             petLevel={profile.petLevel || 1}
             petXp={profile.petXp ?? 0}
+            inventory={profile.inventory || []}
+            equippedCap={profile.equippedCap ?? null}
+            equippedGlasses={profile.equippedGlasses ?? null}
+            equippedClothes={profile.equippedClothes ?? null}
             petName={profile.petName}
+            dayLog={currentDayLog}
             onClaimQuest={handleClaimQuest}
+            onSpendGems={(cost) => setProfile((p) => ({ ...p, gems: Math.max(0, p.gems - cost) }))}
+            onUpdatePetProfile={(updates) => setProfile((p) => ({ ...p, ...updates }))}
           />
         )}
 
-        {/* TAB 5: FOODBUD */}
+        {/* TAB: FOODBUD */}
         {activeTab === 'foodbud' && (
           <FoodBudView
             gems={profile.gems}
@@ -1006,9 +1022,10 @@ export const App: React.FC = () => {
             equippedGlasses={profile.equippedGlasses ?? null}
             equippedClothes={profile.equippedClothes ?? null}
             petName={profile.petName}
+            dayLog={currentDayLog}
+            onClaimQuest={handleClaimQuest}
             onSpendGems={(cost) => setProfile((p) => ({ ...p, gems: Math.max(0, p.gems - cost) }))}
             onUpdatePetProfile={(updates) => setProfile((p) => ({ ...p, ...updates }))}
-            onNavigateToQuests={() => setActiveTab('quests')}
           />
         )}
       </div>
@@ -1017,6 +1034,7 @@ export const App: React.FC = () => {
       <BottomNavigation
         activeTab={activeTab}
         onChangeTab={setActiveTab}
+        unclaimedQuestsCount={calculateUnclaimedQuests(currentDayLog)}
       />
       </>
       )}

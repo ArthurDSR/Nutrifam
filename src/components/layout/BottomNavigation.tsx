@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, ClipboardList, Box, PawPrint, User } from 'lucide-react';
+import { Bot, Dumbbell, ClipboardList, PawPrint, User } from 'lucide-react';
 import { ActiveTab } from '../../types';
 import { useTranslation } from '../../services/i18n';
 import { useTheme } from '../../services/themeService';
@@ -7,17 +7,23 @@ import { useTheme } from '../../services/themeService';
 interface BottomNavigationProps {
   activeTab: ActiveTab;
   onChangeTab: (tab: ActiveTab) => void;
+  unclaimedQuestsCount?: number;
 }
 
+// Order: Coach | Treinos | Diário (center) | FoodBud (notification badge) | Perfil
 const NAV_ITEMS = [
   { id: 'coach', labelKey: 'nav.coach', Icon: Bot },
+  { id: 'workouts', labelKey: 'nav.workouts', Icon: Dumbbell },
   { id: 'journal', labelKey: 'nav.journal', Icon: ClipboardList },
-  { id: 'quests', labelKey: 'nav.quests', Icon: Box },
   { id: 'foodbud', labelKey: 'nav.foodbud', Icon: PawPrint },
   { id: 'profile', labelKey: 'nav.profile', Icon: User }
 ] as const;
 
-export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, onChangeTab }) => {
+export const BottomNavigation: React.FC<BottomNavigationProps> = ({
+  activeTab,
+  onChangeTab,
+  unclaimedQuestsCount = 0
+}) => {
   const { t } = useTranslation();
   const { isDark, activeColor } = useTheme();
 
@@ -33,12 +39,13 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, o
       <div className="grid grid-cols-5 h-[72px] px-2 sm:px-3">
         {NAV_ITEMS.map(({ id, labelKey, Icon }) => {
           const isActive = activeTab === id;
+          const isFoodBudWithNotification = id === 'foodbud' && unclaimedQuestsCount > 0;
 
           return (
             <button
               key={id}
               type="button"
-              onClick={() => onChangeTab(id)}
+              onClick={() => onChangeTab(id as ActiveTab)}
               className="relative min-w-0 flex flex-col items-center justify-center gap-0.5 rounded-2xl active:scale-[0.97] transition-transform duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#232D29]"
               style={{
                 color: isActive
@@ -49,6 +56,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, o
               aria-current={isActive ? 'page' : undefined}
               aria-label={t(labelKey)}
             >
+              {/* Active Tab Pill Indicator */}
               <span
                 className="absolute top-0 h-[3px] w-8 rounded-b-full transition-all duration-200"
                 style={{
@@ -58,8 +66,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, o
                 }}
               />
 
+              {/* Icon Container with Badge */}
               <span
-                className="w-9 h-8 rounded-xl flex items-center justify-center transition-all duration-200"
+                className="relative w-9 h-8 rounded-xl flex items-center justify-center transition-all duration-200"
                 style={{
                   backgroundColor: isActive
                     ? (isDark ? activeColor.darkBg : activeColor.pastel)
@@ -67,10 +76,25 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, o
                   border: `1px solid ${isActive ? (isDark ? activeColor.darkBorder : activeColor.border) : 'transparent'}`
                 }}
               >
-                <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'stroke-[2.4] scale-105' : 'stroke-[1.8]'}`} />
+                <Icon
+                  className={`w-5 h-5 transition-transform duration-200 ${
+                    isActive ? 'stroke-[2.4] scale-105' : 'stroke-[1.8]'
+                  }`}
+                />
+
+                {/* Quests notification badge on Pet */}
+                {isFoodBudWithNotification && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[17px] h-[17px] px-1 rounded-full bg-rose-500 text-white text-[9.5px] font-black flex items-center justify-center shadow-md animate-bounce ring-2 ring-white dark:ring-[#232D29]">
+                    {unclaimedQuestsCount}
+                  </span>
+                )}
               </span>
 
-              <span className={`max-w-full truncate text-[10.5px] tracking-tight leading-none ${isActive ? 'font-extrabold' : 'font-semibold'}`}>
+              <span
+                className={`max-w-full truncate text-[10.5px] tracking-tight leading-none ${
+                  isActive ? 'font-extrabold' : 'font-semibold'
+                }`}
+              >
                 {t(labelKey)}
               </span>
             </button>

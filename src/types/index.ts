@@ -187,8 +187,10 @@ export interface ProductEvaluation {
   }[];
 }
 
-export type ActiveTab = 'coach' | 'journal' | 'quests' | 'foodbud' | 'profile';
+export type ActiveTab = 'coach' | 'workouts' | 'journal' | 'foodbud' | 'profile' | 'quests';
 export type AddFoodSubTab = 'barcode' | 'search' | 'photo' | 'quick_add' | 'my_foods';
-export type ProfileSubTab = 'weight' | 'nutrition';
+export type ProfileSubTab = 'weight' | 'nutrition' | 'strength';
 export type WeightFilter = '1 day' | '7 days' | '1 month' | '6 months' | 'All';
 export type NutritionFilter = '7 days' | '30 days' | '90 days';
+
+export * from './workout';
