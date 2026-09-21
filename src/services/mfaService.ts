@@ -6,6 +6,15 @@ export interface TotpEnrollment {
   secret: string;
 }
 
+/** auth-js versions may return either a ready-to-display data URL or raw SVG. */
+export function normalizeTotpQrCode(qrCode: string): string {
+  if (qrCode.startsWith('data:image/svg+xml')) return qrCode;
+  if (qrCode.trimStart().startsWith('<svg') || qrCode.trimStart().startsWith('<?xml')) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrCode)}`;
+  }
+  throw new Error('O Supabase não retornou um QR válido. Tente configurar novamente.');
+}
+
 /** Remove the former device-only MFA secret. It never represented a server-side factor. */
 export function clearLegacyMfaData(): void {
   for (const key of ['nutrifam_2fa_registry', 'nutrimonitor_2fa_registry']) localStorage.removeItem(key);
@@ -67,7 +76,7 @@ export async function enrollTotp(): Promise<TotpEnrollment> {
   const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'NutriFam' });
   if (error) throw error;
   if (data.type !== 'totp') throw new Error('O Supabase não retornou um fator TOTP.');
-  return { factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret };
+  return { factorId: data.id, qrCode: normalizeTotpQrCode(data.totp.qr_code), secret: data.totp.secret };
 }
 
 export async function verifyTotp(factorId: string, code: string): Promise<void> {
