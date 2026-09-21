@@ -143,7 +143,7 @@ export const App: React.FC = () => {
             email: authUser.email || remoteProfile.email,
             name: (remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ? remoteProfile.name : (authUser.name || remoteProfile.name),
             avatarText: (remoteProfile.name?.[0] || authUser.name?.[0] || 'A').toUpperCase(),
-            avatarUrl: remoteProfile.avatarUrl || profile.avatarUrl || undefined,
+            avatarUrl: remoteProfile.avatarUrl,
             isOnboardingCompleted: hasAccountData
           };
           cloudProfileOwnerRef.current = authUser.id;
@@ -329,7 +329,7 @@ export const App: React.FC = () => {
             const completedRemote: UserProfile = {
               ...profile,
               ...remoteProfile,
-              avatarUrl: remoteProfile.avatarUrl || profile.avatarUrl || undefined,
+              avatarUrl: remoteProfile.avatarUrl,
               isOnboardingCompleted: true
             };
             cloudProfileOwnerRef.current = remoteProfile.id || null;
@@ -389,12 +389,16 @@ export const App: React.FC = () => {
       const remoteProfile = await loadProfileFromSupabase(profile.id);
       if (!cancelled && remoteProfile) {
         cloudProfileOwnerRef.current = profile.id!;
-        setProfile((prev) => ({
-          ...prev,
-          ...remoteProfile,
-          avatarUrl: remoteProfile.avatarUrl || prev.avatarUrl
-        }));
-        saveStoredProfile(remoteProfile);
+        setProfile((prev) => {
+          const refreshedProfile = {
+            ...prev,
+            ...remoteProfile,
+            // The cloud value is authoritative, including an intentional removal.
+            avatarUrl: remoteProfile.avatarUrl
+          };
+          saveStoredProfile(refreshedProfile);
+          return refreshedProfile;
+        });
       }
     };
 

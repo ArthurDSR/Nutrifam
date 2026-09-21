@@ -363,6 +363,7 @@ export async function uploadAvatarImage(
     }
 
     let finalAvatarUrl = dataUrl;
+    let uploadedFilePath: string | null = null;
 
     // 2. Tentar upload para o bucket 'avatars' no Supabase Storage
     try {
@@ -381,6 +382,7 @@ export async function uploadAvatarImage(
         const { data } = client.storage.from('avatars').getPublicUrl(filePath);
         if (data?.publicUrl) {
           finalAvatarUrl = data.publicUrl;
+          uploadedFilePath = filePath;
         }
       } else {
         console.warn('Supabase storage upload aviso (usando fallback dataUrl no banco):', uploadError.message);
@@ -389,33 +391,49 @@ export async function uploadAvatarImage(
       console.warn('Supabase storage exceção (usando fallback dataUrl no banco):', storageErr);
     }
 
-    // 3. PERSISTÊNCIA GARANTIDA NO BANCO DE DADOS:
-    // Salva imediatamente na coluna avatar_url da tabela public.profiles
-    try {
-      const { data: updateData, error: updateErr } = await client
-        .from('profiles')
-        .update({ avatar_url: finalAvatarUrl, updated_at: new Date().toISOString() })
-        .eq('id', targetUserId)
-        .select('id');
+    // 3. Persist the URL before exposing it in the UI. A failed database write
+    // must not look successful on only one device.
+    const updatedAt = new Date().toISOString();
+    const { data: updatedRows, error: updateError } = await client
+      .from('profiles')
+      .update({ avatar_url: finalAvatarUrl, updated_at: updatedAt })
+      .eq('id', targetUserId)
+      .select('id');
 
-      if (updateErr) {
-        console.warn('Erro ao atualizar avatar_url na tabela profiles:', updateErr.message);
-      } else if (!updateData || updateData.length === 0) {
-        // Se a linha ainda não existia no banco para este usuário, faz o upsert básico
-        await client
-          .from('profiles')
-          .upsert({
-            id: targetUserId,
-            name: 'Meu Perfil',
-            avatar_url: finalAvatarUrl,
-            updated_at: new Date().toISOString()
-          });
-      }
-    } catch (dbErr) {
-      console.warn('Exceção ao persistir avatar_url no banco:', dbErr);
+    let persistenceError = updateError;
+    if (!persistenceError && (!updatedRows || updatedRows.length === 0)) {
+      const { error: upsertError } = await client
+        .from('profiles')
+        .upsert({
+          id: targetUserId,
+          name: 'Meu Perfil',
+          avatar_url: finalAvatarUrl,
+          updated_at: updatedAt
+        });
+      persistenceError = upsertError;
     }
 
-    return { success: true, url: finalAvatarUrl };
+    if (persistenceError) {
+      if (uploadedFilePath) {
+        await client.storage.from('avatars').remove([uploadedFilePath]);
+      }
+      return {
+        success: false,
+        url: '',
+        error: `A foto não foi sincronizada com o perfil: ${persistenceError.message}`
+      };
+    }
+
+    // 4. The new URL is safely stored. Remove the previous object only now, so
+    // a failed upload can never leave the user without an avatar.
+    const cleanupError = await removeStoredAvatarFiles(client, targetUserId, uploadedFilePath);
+    return {
+      success: true,
+      url: finalAvatarUrl,
+      error: cleanupError
+        ? `A nova foto foi sincronizada, mas um arquivo antigo não pôde ser apagado: ${cleanupError}`
+        : undefined
+    };
   } catch (err: any) {
     console.error('Erro no upload de avatar:', err);
     return {
@@ -424,6 +442,52 @@ export async function uploadAvatarImage(
       error: err.message || 'Erro ao processar imagem.'
     };
   }
+}
+
+async function removeStoredAvatarFiles(
+  client: NonNullable<ReturnType<typeof getSupabase>>,
+  userId: string,
+  keepPath: string | null = null
+): Promise<string | null> {
+  const keepFileName = keepPath?.split('/').pop() || null;
+  const { data: files, error: listError } = await client.storage
+    .from('avatars')
+    .list(userId, { limit: 100 });
+
+  if (listError) return listError.message;
+
+  const obsoletePaths = (files || [])
+    .filter((file) => file.name !== keepFileName)
+    .map((file) => `${userId}/${file.name}`);
+  if (obsoletePaths.length === 0) return null;
+
+  const { error: removeError } = await client.storage.from('avatars').remove(obsoletePaths);
+  return removeError?.message || null;
+}
+
+export async function removeAvatarImage(userId?: string): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabase();
+  if (!client) return { success: true };
+
+  const activeUserId = await getActiveUserId();
+  const targetUserId = (activeUserId && isValidUuid(activeUserId))
+    ? activeUserId
+    : (userId && isValidUuid(userId) ? userId : null);
+  if (!targetUserId) return { success: true };
+
+  const { error: updateError } = await client
+    .from('profiles')
+    .update({ avatar_url: null, updated_at: new Date().toISOString() })
+    .eq('id', targetUserId);
+  if (updateError) return { success: false, error: updateError.message };
+
+  const cleanupError = await removeStoredAvatarFiles(client, targetUserId);
+  return {
+    success: true,
+    error: cleanupError
+      ? `A foto foi removida do perfil, mas um arquivo antigo não pôde ser apagado: ${cleanupError}`
+      : undefined
+  };
 }
 
 // --------------------------------------------------------------------------------
@@ -740,13 +804,14 @@ export async function deleteWorkoutRoutineFromSupabase(routineId: string, userId
   if (!targetId) return false;
 
   try {
-    const { error } = await client
+    const { data, error } = await client
       .from('workout_routines')
       .delete()
       .eq('id', routineId)
-      .eq('user_id', targetId);
+      .eq('user_id', targetId)
+      .select('id');
 
-    return !error;
+    return !error && Boolean(data?.length);
   } catch (err) {
     console.warn('Error deleting workout routine from Supabase:', err);
     return false;
@@ -802,7 +867,7 @@ export async function saveCompletedWorkoutToSupabase(workout: CompletedWorkout, 
   if (!targetId) return false;
 
   try {
-    const { error } = await client.from('completed_workouts').upsert({
+    const { data, error } = await client.from('completed_workouts').upsert({
       id: workout.id,
       user_id: targetId,
       routine_id: workout.routineId || null,
@@ -817,9 +882,10 @@ export async function saveCompletedWorkoutToSupabase(workout: CompletedWorkout, 
       exercises: workout.exercises || [],
       notes: workout.notes || '',
       created_at: workout.createdAt || new Date().toISOString()
-    });
+    }).select('id');
 
-    return !error;
+    if (error) console.warn('Error saving completed workout to Supabase:', error);
+    return !error && Boolean(data?.some((row) => row.id === workout.id));
   } catch (err) {
     console.warn('Error saving completed workout to Supabase:', err);
     return false;
@@ -834,13 +900,14 @@ export async function deleteCompletedWorkoutFromSupabase(workoutId: string, user
   if (!targetId) return false;
 
   try {
-    const { error } = await client
+    const { data, error } = await client
       .from('completed_workouts')
       .delete()
       .eq('id', workoutId)
-      .eq('user_id', targetId);
+      .eq('user_id', targetId)
+      .select('id');
 
-    return !error;
+    return !error && Boolean(data?.length);
   } catch (err) {
     console.warn('Error deleting completed workout from Supabase:', err);
     return false;

@@ -1,43 +1,23 @@
-import React, { useState, useMemo } from 'react';
-import { TrendingUp, Dumbbell, Calendar, Award, ChevronDown } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { TrendingUp, Dumbbell, Calendar, Award } from 'lucide-react';
 import { CompletedWorkout, ExerciseProgressEntry } from '../../types/workout';
 import { computeExerciseProgression } from '../../services/workoutService';
-import { EXERCISE_DATABASE } from '../../services/exerciseDatabase';
 import { useTheme } from '../../services/themeService';
 
 interface ExerciseProgressChartProps {
   history: CompletedWorkout[];
-  initialExerciseId?: string;
+  exerciseId: string;
 }
 
 export const ExerciseProgressChart: React.FC<ExerciseProgressChartProps> = ({
   history,
-  initialExerciseId
+  exerciseId
 }) => {
   const { activeColor } = useTheme();
 
-  // Find all unique exercises present in workout history
-  const exercisesWithHistory = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const w of history) {
-      for (const ex of w.exercises) {
-        if (!map.has(ex.exerciseId)) {
-          map.set(ex.exerciseId, ex.exerciseName);
-        }
-      }
-    }
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [history]);
-
-  const [selectedExerciseId, setSelectedExerciseId] = useState<string>(() => {
-    if (initialExerciseId) return initialExerciseId;
-    if (exercisesWithHistory.length > 0) return exercisesWithHistory[0].id;
-    return 'chest_bench_press_barbell';
-  });
-
   const progressionData: ExerciseProgressEntry[] = useMemo(() => {
-    return computeExerciseProgression(selectedExerciseId, history);
-  }, [selectedExerciseId, history]);
+    return computeExerciseProgression(exerciseId, history);
+  }, [exerciseId, history]);
 
   // Max Stats
   const bestRecord = useMemo(() => {
@@ -79,38 +59,6 @@ export const ExerciseProgressChart: React.FC<ExerciseProgressChartProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Exercise Selector */}
-      <div className="bg-white dark:bg-[#1E2623] p-4 rounded-3xl border border-[#AEBDB5]/20 dark:border-[#394842] shadow-2xs">
-        <label className="text-[11px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] uppercase tracking-wider block mb-1.5">
-          Selecione o Exercício
-        </label>
-        <div className="relative">
-          <select
-            value={selectedExerciseId}
-            onChange={(e) => setSelectedExerciseId(e.target.value)}
-            className="w-full px-4 py-2.5 bg-[#F7F4EE] dark:bg-[#232D29] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-2xl text-xs font-bold text-[#18201D] dark:text-white appearance-none focus:outline-none"
-          >
-            {exercisesWithHistory.length > 0 ? (
-              <optgroup label="Exercícios com Histórico">
-                {exercisesWithHistory.map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.name}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-            <optgroup label="Catálogo Completo">
-              {EXERCISE_DATABASE.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.name}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-          <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-3 pointer-events-none" />
-        </div>
-      </div>
-
       {/* Overview Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="bg-white dark:bg-[#1E2623] p-4 rounded-3xl border border-[#AEBDB5]/20 dark:border-[#394842] shadow-2xs">

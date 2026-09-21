@@ -4,7 +4,6 @@ import {
   Plus,
   Play,
   History,
-  TrendingUp,
   BookOpen,
   Edit2,
   Trash2,
@@ -27,6 +26,7 @@ import {
   getWorkoutRoutines,
   saveWorkoutRoutine,
   deleteWorkoutRoutine,
+  deleteCompletedWorkout,
   getCompletedWorkouts
 } from '../../services/workoutService';
 import { searchExercises, syncExercisesFromSupabase } from '../../services/exerciseDatabase';
@@ -44,7 +44,7 @@ interface WorkoutsViewProps {
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
 }
 
-type WorkoutSubTab = 'routines' | 'history' | 'progress' | 'exercises';
+type WorkoutSubTab = 'routines' | 'history' | 'exercises';
 
 export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdateProfile }) => {
   const { activeColor } = useTheme();
@@ -52,6 +52,10 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
   const [activeSubTab, setActiveSubTab] = useState<WorkoutSubTab>('routines');
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
   const [history, setHistory] = useState<CompletedWorkout[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [expandedWorkoutId, setExpandedWorkoutId] = useState<string | null>(null);
+  const [deletingRoutineId, setDeletingRoutineId] = useState<string | null>(null);
+  const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null);
 
   // Active workout execution session
   const [activeRoutineForWorkout, setActiveRoutineForWorkout] = useState<WorkoutRoutine | null>(null);
@@ -82,15 +86,26 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
         getCompletedWorkouts(profile.id),
         syncExercisesFromSupabase()
       ]);
-      setRoutines(loadedRoutines);
-      setHistory(loadedHistory);
+      if (loadedRoutines !== null) setRoutines(loadedRoutines);
+      if (loadedHistory === null) {
+        setHistoryError(profile.id ? 'Não foi possível carregar o histórico. Verifique a conexão.' : 'Entre na sua conta para guardar e consultar o histórico.');
+      } else {
+        setHistory(loadedHistory);
+        setHistoryError(null);
+      }
     } catch (err) {
       console.warn('Error loading workout data:', err);
+      setHistoryError('Não foi possível carregar o histórico. Tente novamente.');
     }
   };
 
   useEffect(() => {
     loadData();
+
+    const refreshOnReturn = () => {
+      if (document.visibilityState === 'visible') void loadData();
+    };
+    document.addEventListener('visibilitychange', refreshOnReturn);
 
     // Check for shared workout in URL parameter (?shared_workout=...)
     if (typeof window !== 'undefined' && window.location.search) {
@@ -101,6 +116,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
         setIsImportModalOpen(true);
       }
     }
+    return () => document.removeEventListener('visibilitychange', refreshOnReturn);
   }, [profile.id]);
 
   // Start workout session
@@ -118,7 +134,9 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
   const handleWorkoutFinished = (completed: CompletedWorkout) => {
     setIsExecutingWorkout(false);
     setActiveRoutineForWorkout(null);
-    setHistory((prev) => [completed, ...prev]);
+    setHistory((prev) => [completed, ...prev.filter((item) => item.id !== completed.id)]);
+    setHistoryError(null);
+    setExpandedWorkoutId(completed.id);
 
     // Add burned calories to profile
     if (completed.caloriesBurned > 0) {
@@ -132,16 +150,37 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
   };
 
   // Routine CRUD
-  const handleSaveRoutine = async (routine: WorkoutRoutine) => {
-    await saveWorkoutRoutine(routine, profile.id);
-    await loadData();
+  const handleSaveRoutine = async (routine: WorkoutRoutine): Promise<boolean> => {
+    const saved = await saveWorkoutRoutine(routine, profile.id);
+    if (saved) await loadData();
+    return saved;
   };
 
   const handleDeleteRoutine = async (routineId: string) => {
     if (confirm('Tem certeza que deseja excluir esta ficha de treino?')) {
-      await deleteWorkoutRoutine(routineId, profile.id);
-      await loadData();
+      setDeletingRoutineId(routineId);
+      const deleted = await deleteWorkoutRoutine(routineId, profile.id);
+      if (deleted) {
+        setRoutines((prev) => prev.filter((routine) => routine.id !== routineId));
+        if (selectedRoutineForDetail?.id === routineId) setSelectedRoutineForDetail(null);
+      } else {
+        alert('Não foi possível excluir a ficha. Verifique sua conexão e tente novamente.');
+      }
+      setDeletingRoutineId(null);
     }
+  };
+
+  const handleDeleteCompletedWorkout = async (workoutId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este treino do histórico?')) return;
+
+    setDeletingWorkoutId(workoutId);
+    const deleted = await deleteCompletedWorkout(workoutId, profile.id);
+    if (deleted) {
+      setHistory((prev) => prev.filter((workout) => workout.id !== workoutId));
+    } else {
+      alert('Não foi possível excluir o treino. Verifique sua conexão e tente novamente.');
+    }
+    setDeletingWorkoutId(null);
   };
 
   // If live workout is currently in progress, render execution view
@@ -150,6 +189,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
       <WorkoutExecutionView
         routine={activeRoutineForWorkout}
         profile={profile}
+        history={history}
         onFinish={handleWorkoutFinished}
         onCancel={() => {
           setIsExecutingWorkout(false);
@@ -216,17 +256,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
             Histórico
           </button>
           <button
-            onClick={() => setActiveSubTab('progress')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeSubTab === 'progress'
-                ? 'bg-white dark:bg-[#1E2623] text-[#18201D] dark:text-white shadow-xs'
-                : 'text-[#6F7C76] dark:text-[#A8B8B1] hover:text-[#18201D]'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            Cargas
-          </button>
-          <button
             onClick={() => setActiveSubTab('exercises')}
             className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeSubTab === 'exercises'
@@ -269,6 +298,18 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
               </button>
             </div>
           </div>
+
+          {routines.length === 0 && (
+            <div className="bg-white dark:bg-[#1E2623] rounded-3xl p-8 border border-[#AEBDB5]/20 dark:border-[#394842] text-center">
+              <Dumbbell className="w-10 h-10 mx-auto text-slate-400 mb-2 opacity-60" />
+              <p className="text-xs font-bold text-[#3F4B46] dark:text-[#EDF2EF]">
+                Nenhuma ficha de treino ainda.
+              </p>
+              <p className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1] mt-1">
+                Crie sua própria ficha ou importe uma compartilhada.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-3">
             {routines.map((routine) => (
@@ -320,7 +361,8 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                       </button>
                       <button
                         onClick={() => handleDeleteRoutine(routine.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                        disabled={deletingRoutineId === routine.id}
+                        className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors disabled:opacity-40"
                         title="Excluir Ficha"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -371,7 +413,13 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
             Treinos Realizados ({history.length})
           </h2>
 
-          {history.length === 0 ? (
+          {historyError && (
+            <div role="alert" className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between gap-2">
+              <span>{historyError}</span><button onClick={loadData} className="font-bold underline">Tentar novamente</button>
+            </div>
+          )}
+
+          {history.length === 0 && !historyError ? (
             <div className="bg-white dark:bg-[#1E2623] rounded-3xl p-8 border border-[#AEBDB5]/20 dark:border-[#394842] text-center">
               <History className="w-10 h-10 mx-auto text-slate-400 mb-2 opacity-60" />
               <p className="text-xs font-bold text-[#3F4B46] dark:text-[#EDF2EF]">
@@ -412,7 +460,8 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                     </h3>
                   </div>
 
-                  <div className="text-right">
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
                     <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono flex items-center justify-end gap-1">
                       <Flame className="w-3.5 h-3.5" />
                       {item.caloriesBurned} kcal
@@ -420,6 +469,16 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                     <span className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">
                       Gasto Científico (MET)
                     </span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteCompletedWorkout(item.id)}
+                      disabled={deletingWorkoutId === item.id}
+                      className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40"
+                      title="Excluir treino do histórico"
+                      aria-label="Excluir treino do histórico"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
@@ -451,22 +510,31 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                   </div>
                 </div>
 
-                {/* Exercises list in this completed workout */}
-                <div className="space-y-1.5 pt-1">
+                <button type="button" onClick={() => setExpandedWorkoutId((prev) => prev === item.id ? null : item.id)}
+                  className="text-xs font-bold text-blue-600 dark:text-blue-400 w-full text-left py-1">
+                  {expandedWorkoutId === item.id ? 'Ocultar séries e exercícios ↑' : `Ver ${item.exercises.length} exercícios e séries ↓`}
+                </button>
+
+                {expandedWorkoutId === item.id && <div className="space-y-2 pt-1">
                   {item.exercises.map((ex, exIdx) => (
                     <div
                       key={exIdx}
-                      className="text-xs p-2 rounded-xl bg-slate-50 dark:bg-[#202924] flex items-center justify-between"
+                      className="text-xs p-3 rounded-xl bg-slate-50 dark:bg-[#202924] space-y-2"
                     >
-                      <span className="font-bold text-[#3F4B46] dark:text-[#EDF2EF]">
+                      <button type="button" onClick={() => setViewingExerciseDetail(searchExercises(ex.exerciseName).find((catalog) => catalog.id === ex.exerciseId) || {
+                        id: ex.exerciseId, name: ex.exerciseName, category: ex.category, equipment: 'other', targetMuscle: '', instructions: ''
+                      })} className="font-bold text-blue-600 dark:text-blue-400 text-left">
                         {ex.exerciseName}
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        {ex.sets.map((s) => `${s.weightKg}kg×${s.reps}`).join(' | ')}
-                      </span>
+                      </button>
+                      <div className="space-y-1">{ex.sets.map((set, idx) => (
+                        <div key={idx} className="flex justify-between font-mono text-[11px] text-[#3F4B46] dark:text-[#EDF2EF]">
+                          <span>{set.type === 'warmup' ? 'W' : set.type === 'failure' ? 'F' : set.type === 'dropset' ? 'D' : set.setNumber}</span>
+                          <span>{set.weightKg} kg × {set.reps} reps</span>
+                        </div>
+                      ))}</div>
                     </div>
                   ))}
-                </div>
+                </div>}
 
                 {item.notes && (
                   <p className="text-[11px] italic text-[#6F7C76] dark:text-[#A8B8B1] border-l-2 border-emerald-500 pl-2">
@@ -479,12 +547,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
         </div>
       )}
 
-      {/* TAB 3: PROGRESSÃO & CARGAS (1RM & EVOLUÇÃO) */}
-      {activeSubTab === 'progress' && (
-        <ExerciseProgressChart history={history} />
-      )}
-
-      {/* TAB 4: CATÁLOGO DE EXERCÍCIOS */}
+      {/* TAB 3: CATÁLOGO DE EXERCÍCIOS */}
       {activeSubTab === 'exercises' && (
         <div className="space-y-3">
           {/* Search bar */}
@@ -582,6 +645,12 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
         initialRoutine={editingRoutine}
         onClose={() => setIsEditorOpen(false)}
         onSave={handleSaveRoutine}
+        onSelectExercise={(exerciseId, exerciseName) => {
+          const catalog = searchExercises(exerciseName).find((exercise) => exercise.id === exerciseId);
+          setViewingExerciseDetail(catalog || {
+            id: exerciseId, name: exerciseName, category: 'chest', equipment: 'other', targetMuscle: '', instructions: ''
+          });
+        }}
       />
 
       {/* Routine Detail Modal (Hevy Style) */}
@@ -601,9 +670,14 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
           onShareRoutine={(r) => {
             setSharingRoutine(r);
           }}
+          onSelectExercise={(exerciseId, exerciseName) => {
+            const catalog = searchExercises(exerciseName).find((exercise) => exercise.id === exerciseId);
+            setViewingExerciseDetail(catalog || {
+              id: exerciseId, name: exerciseName, category: 'chest', equipment: 'other', targetMuscle: '', instructions: ''
+            });
+          }}
           onUpdateRoutine={async (updated) => {
-            await handleSaveRoutine(updated);
-            setSelectedRoutineForDetail(updated);
+            if (await handleSaveRoutine(updated)) setSelectedRoutineForDetail(updated);
           }}
         />
       )}
@@ -635,7 +709,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
       {/* Exercise Detail Modal */}
       {viewingExerciseDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-sm bg-white dark:bg-[#1E2623] rounded-3xl p-6 shadow-2xl border border-[#AEBDB5]/20 dark:border-[#394842] space-y-4">
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white dark:bg-[#1E2623] rounded-3xl p-6 shadow-2xl border border-[#AEBDB5]/20 dark:border-[#394842] space-y-4">
             <div className="flex items-center gap-3">
               <ExerciseThumbnail
                 exerciseId={viewingExerciseDetail.id}
@@ -705,6 +779,11 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                 </p>
               </div>
             )}
+
+            <div className="border-t border-[#AEBDB5]/20 dark:border-[#394842] pt-3">
+              <h4 className="text-xs font-black text-[#18201D] dark:text-white mb-2">Sua evolução neste exercício</h4>
+              <ExerciseProgressChart history={history} exerciseId={viewingExerciseDetail.id} />
+            </div>
 
             <button
               onClick={() => setViewingExerciseDetail(null)}

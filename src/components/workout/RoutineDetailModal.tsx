@@ -10,6 +10,7 @@ interface RoutineDetailModalProps {
   onEditRoutine?: (routine: WorkoutRoutine) => void;
   onShareRoutine?: (routine: WorkoutRoutine) => void;
   onUpdateRoutine?: (routine: WorkoutRoutine) => Promise<void> | void;
+  onSelectExercise?: (exerciseId: string, exerciseName: string) => void;
 }
 
 function formatMinutesSeconds(totalSeconds: number): string {
@@ -25,7 +26,8 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
   onStartWorkout,
   onEditRoutine,
   onShareRoutine,
-  onUpdateRoutine
+  onUpdateRoutine,
+  onSelectExercise
 }) => {
   const [currentRoutine, setCurrentRoutine] = useState<WorkoutRoutine>(routine);
   const [editingRestExIndex, setEditingRestExIndex] = useState<number | null>(null);
@@ -174,9 +176,11 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
                     allowPreview={true}
                   />
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-base sm:text-lg font-bold text-[#0080FF] hover:underline cursor-pointer truncate">
+                    <button type="button" onClick={() => onSelectExercise?.(ex.exerciseId, ex.exerciseName)}
+                      className="text-left w-full text-base sm:text-lg font-bold text-[#0080FF] hover:underline cursor-pointer truncate"
+                      title="Ver evolução deste exercício">
                       {ex.exerciseName}
-                    </h3>
+                    </button>
                   </div>
                 </div>
 

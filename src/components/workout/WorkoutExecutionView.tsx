@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Clock,
   Check,
@@ -21,8 +21,8 @@ import {
 import { UserProfile } from '../../types';
 import { EXERCISE_DATABASE, searchExercises } from '../../services/exerciseDatabase';
 import { finishAndSaveWorkout } from '../../services/workoutService';
-import { RestTimerModal } from './RestTimerModal';
 import { ExerciseThumbnail } from './ExerciseThumbnail';
+import { ExerciseProgressChart } from './ExerciseProgressChart';
 import { useTheme } from '../../services/themeService';
 
 function formatMinutesSeconds(totalSeconds: number): string {
@@ -35,6 +35,7 @@ function formatMinutesSeconds(totalSeconds: number): string {
 interface WorkoutExecutionViewProps {
   routine?: WorkoutRoutine | null;
   profile: UserProfile;
+  history: CompletedWorkout[];
   onFinish: (workout: CompletedWorkout) => void;
   onCancel: () => void;
 }
@@ -42,6 +43,7 @@ interface WorkoutExecutionViewProps {
 export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
   routine,
   profile,
+  history,
   onFinish,
   onCancel
 }) => {
@@ -90,10 +92,68 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [workoutNotes, setWorkoutNotes] = useState('');
 
-  // Rest timer modal state
-  const [isRestTimerOpen, setIsRestTimerOpen] = useState(false);
-  const [restTimerSeconds, setRestTimerSeconds] = useState(60);
+  // Deadline-based timer keeps counting even when the browser throttles tabs.
+  const [restDeadline, setRestDeadline] = useState<number | null>(null);
+  const [restTotalSeconds, setRestTotalSeconds] = useState(60);
+  const [restNow, setRestNow] = useState(Date.now());
   const [restExerciseName, setRestExerciseName] = useState('');
+  const [restFinished, setRestFinished] = useState(false);
+  const restAlarmPlayed = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const [selectedProgressExercise, setSelectedProgressExercise] = useState<{ id: string; name: string } | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
+
+  useEffect(() => () => {
+    if (audioContextRef.current) void audioContextRef.current.close();
+  }, []);
+
+  useEffect(() => {
+    if (restDeadline === null) return;
+    const interval = window.setInterval(() => setRestNow(Date.now()), 500);
+    const onResume = () => setRestNow(Date.now());
+    document.addEventListener('visibilitychange', onResume);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onResume);
+    };
+  }, [restDeadline]);
+
+  const restSecondsLeft = restDeadline === null ? 0 : Math.max(0, Math.ceil((restDeadline - restNow) / 1000));
+
+  useEffect(() => {
+    if (restDeadline === null || restSecondsLeft > 0 || restAlarmPlayed.current) return;
+    restAlarmPlayed.current = true;
+    setRestFinished(true);
+    try {
+      const audio = audioContextRef.current;
+      if (audio) {
+        void audio.resume().catch(() => {});
+        [0, 0.18, 0.36].forEach((offset) => {
+          const oscillator = audio.createOscillator();
+          const gain = audio.createGain();
+          oscillator.frequency.value = offset === 0.36 ? 1100 : 880;
+          gain.gain.setValueAtTime(0.2, audio.currentTime + offset);
+          gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + offset + 0.14);
+          oscillator.connect(gain);
+          gain.connect(audio.destination);
+          oscillator.start(audio.currentTime + offset);
+          oscillator.stop(audio.currentTime + offset + 0.14);
+        });
+      }
+      navigator.vibrate?.([200, 100, 200]);
+    } catch { /* Sound/vibration may be unavailable on this device. */ }
+  }, [restDeadline, restSecondsLeft]);
+
+  const adjustRest = (deltaSeconds: number) => {
+    setRestTotalSeconds((total) => Math.max(15, total + deltaSeconds));
+    setRestDeadline((deadline) => deadline === null ? null : Math.max(Date.now(), deadline + deltaSeconds * 1000));
+    setRestNow(Date.now());
+    if (deltaSeconds > 0) {
+      restAlarmPlayed.current = false;
+      setRestFinished(false);
+    }
+  };
 
   // Exercise Picker inside active workout
   const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
@@ -146,9 +206,16 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
 
     // Trigger rest timer automatically when set is completed
     if (willBeCompleted) {
-      setRestTimerSeconds(exercise.restSeconds || 60);
+      try {
+        if (!audioContextRef.current) audioContextRef.current = new AudioContext();
+        void audioContextRef.current.resume().catch(() => {});
+      } catch { /* Audio unsupported. */ }
       setRestExerciseName(exercise.exerciseName);
-      setIsRestTimerOpen(true);
+      setRestTotalSeconds(exercise.restSeconds || 60);
+      restAlarmPlayed.current = false;
+      setRestFinished(false);
+      setRestNow(Date.now());
+      setRestDeadline(Date.now() + (exercise.restSeconds || 60) * 1000);
       if (navigator.vibrate) {
         try {
           navigator.vibrate(50);
@@ -284,6 +351,7 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
 
   // Finish Workout
   const handleTriggerFinish = async () => {
+    if (isFinishing) return;
     const completedSetsCount = session.exercises.reduce(
       (acc, ex) => acc + ex.sets.filter((s) => s.isCompleted).length,
       0
@@ -295,8 +363,17 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
       }
     }
 
-    const workout = await finishAndSaveWorkout(session, profile, workoutNotes);
-    setFinishedWorkoutData(workout);
+    setIsFinishing(true);
+    setFinishError(null);
+    try {
+      const workout = await finishAndSaveWorkout(session, profile, workoutNotes);
+      setRestDeadline(null);
+      setFinishedWorkoutData(workout);
+    } catch (error) {
+      setFinishError(error instanceof Error ? error.message : 'Não foi possível guardar o treino. Tente novamente.');
+    } finally {
+      setIsFinishing(false);
+    }
   };
 
   const handleFinalAcknowledge = () => {
@@ -340,17 +417,20 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
           </button>
           <button
             onClick={handleTriggerFinish}
+            disabled={isFinishing}
             className="px-4 py-1.5 rounded-xl text-xs font-black text-white shadow-md active:scale-95 transition-transform flex items-center gap-1"
             style={{ backgroundColor: activeColor.primary }}
           >
             <Check className="w-3.5 h-3.5" />
-            Finalizar
+            {isFinishing ? 'Salvando...' : 'Finalizar'}
           </button>
         </div>
       </header>
 
+      {finishError && <p role="alert" className="px-4 py-2 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-200 text-xs font-semibold">{finishError}</p>}
+
       {/* Main Exercises List */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 touch-pan-y">
+      <div className={`flex-1 overflow-y-auto px-4 py-4 space-y-4 touch-pan-y ${restDeadline !== null ? 'pb-32' : ''}`}>
         {session.exercises.length === 0 ? (
           <div className="text-center py-16 border-2 border-dashed border-[#AEBDB5]/30 dark:border-[#394842] rounded-3xl">
             <Dumbbell className="w-10 h-10 mx-auto text-slate-400 mb-2 opacity-60" />
@@ -385,9 +465,11 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
                     allowPreview={true}
                   />
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-xs sm:text-sm font-black text-[#0080FF] dark:text-blue-400 truncate">
+                    <button type="button" onClick={() => setSelectedProgressExercise({ id: exercise.exerciseId, name: exercise.exerciseName })}
+                      className="text-left text-xs sm:text-sm font-black text-[#0080FF] dark:text-blue-400 truncate hover:underline w-full"
+                      title="Ver evolução deste exercício">
                       {exercise.exerciseName}
-                    </h3>
+                    </button>
                     <div className="flex items-center gap-1.5 mt-1">
                       <Timer className="w-3.5 h-3.5 text-[#0080FF] shrink-0" />
                       <span className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">Descanso:</span>
@@ -595,13 +677,32 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
         </div>
       </div>
 
-      {/* Rest Timer Modal */}
-      <RestTimerModal
-        isOpen={isRestTimerOpen}
-        initialSeconds={restTimerSeconds}
-        exerciseName={restExerciseName}
-        onClose={() => setIsRestTimerOpen(false)}
-      />
+      {/* Persistent in-app rest notification. Closing other panels never stops it. */}
+      {restDeadline !== null && (
+        <div role="status" aria-live={restFinished ? 'assertive' : 'off'}
+          className="absolute bottom-4 left-3 right-3 z-40 max-w-md mx-auto bg-white dark:bg-[#25302B] border border-blue-200 dark:border-blue-900 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="px-3 pt-2 flex items-center justify-between text-[10px] font-semibold text-[#6F7C76] dark:text-[#A8B8B1]">
+            <span className="truncate">{restFinished ? 'Descanso concluído · próxima série!' : `Descanso · ${restExerciseName}`}</span>
+            <button type="button" onClick={() => setRestDeadline(null)} className="p-1" aria-label="Dispensar aviso de descanso"><X className="w-3.5 h-3.5" /></button>
+          </div>
+          <div className="px-3 pb-2 flex items-center justify-between gap-2">
+            <button type="button" onClick={() => adjustRest(-15)} className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#34423C] text-xs font-bold">-15s</button>
+            <span className="font-mono font-black text-lg text-[#18201D] dark:text-white">{formatMinutesSeconds(restSecondsLeft)}</span>
+            <button type="button" onClick={() => adjustRest(15)} className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#34423C] text-xs font-bold">+15s</button>
+            <button type="button" onClick={() => setRestDeadline(null)} className="px-2 py-1 rounded-lg bg-blue-600 text-white text-xs font-bold">Pular</button>
+          </div>
+          <div className="h-1 bg-blue-100 dark:bg-blue-950"><div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${Math.max(0, Math.min(100, (restSecondsLeft / restTotalSeconds) * 100))}%` }} /></div>
+        </div>
+      )}
+
+      {selectedProgressExercise && (
+        <div className="fixed inset-0 z-50 bg-black/65 flex items-end sm:items-center justify-center p-2" onClick={() => setSelectedProgressExercise(null)}>
+          <div className="bg-[#F7F4EE] dark:bg-[#18201D] rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between"><h2 className="font-bold text-sm">{selectedProgressExercise.name} · evolução</h2><button onClick={() => setSelectedProgressExercise(null)} aria-label="Fechar evolução"><X className="w-5 h-5" /></button></div>
+            <ExerciseProgressChart history={history} exerciseId={selectedProgressExercise.id} />
+          </div>
+        </div>
+      )}
 
       {/* Exercise Picker Modal */}
       {isExercisePickerOpen && (

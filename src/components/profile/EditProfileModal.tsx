@@ -3,7 +3,7 @@ import { X, Check, Calculator, Camera, Trash2, Loader2 } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { calculateNutrition } from '../../services/nutritionCalculator';
 import { useTheme } from '../../services/themeService';
-import { uploadAvatarImage, saveProfileToSupabase, isSupabaseConfigured } from '../../services/supabaseClient';
+import { uploadAvatarImage, removeAvatarImage, saveProfileToSupabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
 interface EditProfileModalProps {
   profile: UserProfile;
@@ -53,6 +53,30 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       }
     } catch (err: any) {
       setUploadError(err.message || 'Falha ao processar a foto.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handlePhotoRemoval = async () => {
+    setIsUploadingPhoto(true);
+    setUploadError(null);
+
+    try {
+      const result = await removeAvatarImage(profile.id);
+      if (!result.success) {
+        setUploadError(result.error || 'Não foi possível remover a foto.');
+        return;
+      }
+      if (result.error) setUploadError(result.error);
+
+      setAvatarUrl('');
+      onSaveProfile({
+        ...profile,
+        avatarUrl: undefined
+      });
+    } catch (err: any) {
+      setUploadError(err.message || 'Não foi possível remover a foto.');
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -185,13 +209,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               {avatarUrl && !isUploadingPhoto && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setAvatarUrl('');
-                    onSaveProfile({
-                      ...profile,
-                      avatarUrl: undefined
-                    });
-                  }}
+                  onClick={handlePhotoRemoval}
                   className="text-[11px] font-medium text-rose-500 hover:text-rose-600 transition-colors flex items-center gap-0.5"
                 >
                   <Trash2 className="w-3 h-3" />

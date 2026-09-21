@@ -11,7 +11,9 @@ import {
   saveWorkoutRoutineToSupabase,
   deleteWorkoutRoutineFromSupabase,
   loadCompletedWorkoutsFromSupabase,
-  saveCompletedWorkoutToSupabase
+  saveCompletedWorkoutToSupabase,
+  deleteCompletedWorkoutFromSupabase,
+  getActiveUserId
 } from './supabaseClient';
 
 // ---------------------------------------------------------------------------
@@ -104,7 +106,7 @@ export function computeExerciseProgression(
       }
     }
 
-    if (bestWeight > 0) {
+    if (exercise.sets.length > 0) {
       entries.push({
         date: workout.date,
         weightKg: bestWeight,
@@ -119,172 +121,11 @@ export function computeExerciseProgression(
 }
 
 // ---------------------------------------------------------------------------
-// Default Routine Templates (Ready to use out-of-the-box)
-// ---------------------------------------------------------------------------
-export const DEFAULT_WORKOUT_TEMPLATES: WorkoutRoutine[] = [
-  {
-    id: 'template_push',
-    title: 'Treino A - Push (Peito, Ombros e Tríceps)',
-    description: 'Foco em cadeia anterior superior e movimentos de empurrar.',
-    category: 'push',
-    exercises: [
-      {
-        exerciseId: 'chest_bench_press_barbell',
-        exerciseName: 'Supino Reto com Barra',
-        category: 'chest',
-        targetSets: 4,
-        targetReps: '8-10',
-        restSeconds: 90,
-        notes: 'Carga progressiva'
-      },
-      {
-        exerciseId: 'chest_incline_bench_press_dumbbell',
-        exerciseName: 'Supino Inclinado com Halteres',
-        category: 'chest',
-        targetSets: 3,
-        targetReps: '10-12',
-        restSeconds: 75
-      },
-      {
-        exerciseId: 'shoulders_dumbbell_shoulder_press',
-        exerciseName: 'Desenvolvimento com Halteres',
-        category: 'shoulders',
-        targetSets: 3,
-        targetReps: '10-12',
-        restSeconds: 75
-      },
-      {
-        exerciseId: 'shoulders_lateral_raise_dumbbell',
-        exerciseName: 'Elevação Lateral com Halteres',
-        category: 'shoulders',
-        targetSets: 4,
-        targetReps: '12-15',
-        restSeconds: 60
-      },
-      {
-        exerciseId: 'triceps_rope_pushdown',
-        exerciseName: 'Tríceps Corda na Polia',
-        category: 'triceps',
-        targetSets: 3,
-        targetReps: '12-15',
-        restSeconds: 60
-      }
-    ],
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'template_pull',
-    title: 'Treino B - Pull (Costas, Bíceps e Trapézio)',
-    description: 'Foco em dorsais, trapézio, deltoide posterior e bíceps.',
-    category: 'pull',
-    exercises: [
-      {
-        exerciseId: 'back_lat_pulldown_wide',
-        exerciseName: 'Puxada Frontal Aberta (Pulldown)',
-        category: 'back',
-        targetSets: 4,
-        targetReps: '8-10',
-        restSeconds: 90
-      },
-      {
-        exerciseId: 'back_barbell_bent_over_row',
-        exerciseName: 'Remada Curvada com Barra',
-        category: 'back',
-        targetSets: 4,
-        targetReps: '8-10',
-        restSeconds: 90
-      },
-      {
-        exerciseId: 'shoulders_face_pull',
-        exerciseName: 'Face Pull na Polia',
-        category: 'shoulders',
-        targetSets: 3,
-        targetReps: '12-15',
-        restSeconds: 60
-      },
-      {
-        exerciseId: 'biceps_barbell_curl',
-        exerciseName: 'Rosca Direta com Barra',
-        category: 'biceps',
-        targetSets: 3,
-        targetReps: '10-12',
-        restSeconds: 60
-      },
-      {
-        exerciseId: 'biceps_hammer_curl',
-        exerciseName: 'Rosca Martelo com Halteres',
-        category: 'biceps',
-        targetSets: 3,
-        targetReps: '10-12',
-        restSeconds: 60
-      }
-    ],
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'template_legs',
-    title: 'Treino C - Pernas & Core (Legs)',
-    description: 'Foco completo em membros inferiores e abdômen.',
-    category: 'legs',
-    exercises: [
-      {
-        exerciseId: 'legs_barbell_squat',
-        exerciseName: 'Agachamento Livre com Barra',
-        category: 'legs',
-        targetSets: 4,
-        targetReps: '8-10',
-        restSeconds: 120
-      },
-      {
-        exerciseId: 'legs_leg_press_45',
-        exerciseName: 'Leg Press 45°',
-        category: 'legs',
-        targetSets: 3,
-        targetReps: '10-12',
-        restSeconds: 90
-      },
-      {
-        exerciseId: 'legs_romanian_deadlift',
-        exerciseName: 'Stiff / Levantamento Romeno (RDL)',
-        category: 'legs',
-        targetSets: 3,
-        targetReps: '10-12',
-        restSeconds: 90
-      },
-      {
-        exerciseId: 'calves_standing_raise_machine',
-        exerciseName: 'Panturrilha em Pé na Máquina',
-        category: 'calves',
-        targetSets: 4,
-        targetReps: '15-20',
-        restSeconds: 60
-      },
-      {
-        exerciseId: 'abs_plank',
-        exerciseName: 'Prancha Isométrica',
-        category: 'abs',
-        targetSets: 3,
-        targetReps: '45s',
-        restSeconds: 60
-      }
-    ],
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
-  }
-];
-
-// ---------------------------------------------------------------------------
 // Supabase Data Access Service
 // ---------------------------------------------------------------------------
-export async function getWorkoutRoutines(userId?: string): Promise<WorkoutRoutine[]> {
-  const cloudRoutines = await loadWorkoutRoutinesFromSupabase(userId);
-  if (cloudRoutines && cloudRoutines.length > 0) {
-    return cloudRoutines;
-  }
-  // Return default templates if no custom routines saved yet
-  return DEFAULT_WORKOUT_TEMPLATES;
+export async function getWorkoutRoutines(userId?: string): Promise<WorkoutRoutine[] | null> {
+  // A failed fetch is distinct from a genuinely empty account.
+  return loadWorkoutRoutinesFromSupabase(userId);
 }
 
 export async function saveWorkoutRoutine(routine: WorkoutRoutine, userId?: string): Promise<boolean> {
@@ -295,9 +136,12 @@ export async function deleteWorkoutRoutine(routineId: string, userId?: string): 
   return await deleteWorkoutRoutineFromSupabase(routineId, userId);
 }
 
-export async function getCompletedWorkouts(userId?: string): Promise<CompletedWorkout[]> {
-  const cloudWorkouts = await loadCompletedWorkoutsFromSupabase(userId);
-  return cloudWorkouts || [];
+export async function deleteCompletedWorkout(workoutId: string, userId?: string): Promise<boolean> {
+  return await deleteCompletedWorkoutFromSupabase(workoutId, userId);
+}
+
+export async function getCompletedWorkouts(userId?: string): Promise<CompletedWorkout[] | null> {
+  return loadCompletedWorkoutsFromSupabase(userId);
 }
 
 export async function finishAndSaveWorkout(
@@ -305,6 +149,11 @@ export async function finishAndSaveWorkout(
   profile: UserProfile,
   notes?: string
 ): Promise<CompletedWorkout> {
+  const authenticatedUserId = await getActiveUserId();
+  if (!authenticatedUserId || authenticatedUserId !== profile.id) {
+    throw new Error('Entre na sua conta antes de finalizar para guardar o treino no histórico.');
+  }
+
   const endTime = new Date().toISOString();
   const startTimeIso = new Date(session.startTime).toISOString();
   const durationMinutes = Math.max(1, Math.round((Date.now() - session.startTime) / 60000));
@@ -320,6 +169,7 @@ export async function finishAndSaveWorkout(
       totalVolumeKg += (s.weightKg || 0) * (s.reps || 0);
       return {
         setNumber: s.setNumber,
+        type: s.type || 'normal',
         weightKg: s.weightKg || 0,
         reps: s.reps || 0
       };
@@ -340,11 +190,12 @@ export async function finishAndSaveWorkout(
     profile.currentWeightKg || 70
   );
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const completedWorkout: CompletedWorkout = {
     id: `workout_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    userId: profile.id,
+    userId: authenticatedUserId,
     routineId: session.routineId,
     title: session.routineTitle || 'Treino do Dia',
     date: todayStr,
@@ -360,7 +211,10 @@ export async function finishAndSaveWorkout(
   };
 
   // Persist directly to Supabase cloud
-  await saveCompletedWorkoutToSupabase(completedWorkout, profile.id);
+  const saved = await saveCompletedWorkoutToSupabase(completedWorkout, authenticatedUserId);
+  if (!saved) {
+    throw new Error('Não foi possível salvar o treino no banco. Confira sua conexão e tente finalizar novamente.');
+  }
 
   return completedWorkout;
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Dumbbell, Search, ChevronRight, Check } from 'lucide-react';
-import { WorkoutRoutine, RoutineExercise, MuscleCategory } from '../../types/workout';
+import { WorkoutRoutine, RoutineExercise, RoutineExerciseSet, MuscleCategory, SetType } from '../../types/workout';
 import { EXERCISE_DATABASE, searchExercises } from '../../services/exerciseDatabase';
 import { ExerciseThumbnail } from './ExerciseThumbnail';
 import { useTheme } from '../../services/themeService';
@@ -9,7 +9,8 @@ interface RoutineEditorModalProps {
   isOpen: boolean;
   initialRoutine?: WorkoutRoutine | null;
   onClose: () => void;
-  onSave: (routine: WorkoutRoutine) => void;
+  onSave: (routine: WorkoutRoutine) => Promise<boolean>;
+  onSelectExercise?: (exerciseId: string, exerciseName: string) => void;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -38,7 +39,8 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
   isOpen,
   initialRoutine,
   onClose,
-  onSave
+  onSave,
+  onSelectExercise
 }) => {
   const { activeColor } = useTheme();
 
@@ -46,6 +48,8 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<WorkoutRoutine['category']>('custom');
   const [exercises, setExercises] = useState<RoutineExercise[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Exercise Picker Modal State
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -54,6 +58,7 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setSaveError(null);
       if (initialRoutine) {
         setTitle(initialRoutine.title || '');
         setDescription(initialRoutine.description || '');
@@ -77,7 +82,8 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
       category: ex.category,
       targetSets: 3,
       targetReps: '10-12',
-      restSeconds: 60
+      restSeconds: 60,
+      sets: Array.from({ length: 3 }, (): RoutineExerciseSet => ({ type: 'normal', targetReps: '10-12' }))
     };
     setExercises((prev) => [...prev, newRoutineEx]);
     setIsPickerOpen(false);
@@ -93,7 +99,29 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
     setExercises((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleSave = () => {
+  const updateSetCount = (index: number, count: number) => {
+    const safeCount = Math.max(1, Math.min(20, count));
+    setExercises((prev) => prev.map((exercise, idx) => {
+      if (idx !== index) return exercise;
+      const sets = Array.from({ length: safeCount }, (_, setIndex) =>
+        exercise.sets?.[setIndex] || { type: 'normal' as SetType, targetReps: exercise.targetReps }
+      );
+      return { ...exercise, targetSets: safeCount, sets };
+    }));
+  };
+
+  const updateSet = (exerciseIndex: number, setIndex: number, updates: Partial<RoutineExerciseSet>) => {
+    setExercises((prev) => prev.map((exercise, idx) => {
+      if (idx !== exerciseIndex) return exercise;
+      const sets = Array.from({ length: exercise.targetSets || 3 }, (_, i) =>
+        exercise.sets?.[i] || { type: 'normal' as SetType, targetReps: exercise.targetReps }
+      );
+      sets[setIndex] = { ...sets[setIndex], ...updates };
+      return { ...exercise, sets };
+    }));
+  };
+
+  const handleSave = async () => {
     if (!title.trim()) {
       alert('Por favor, dê um nome para sua ficha de treino.');
       return;
@@ -114,8 +142,16 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
       updatedAt: new Date().toISOString()
     };
 
-    onSave(routine);
-    onClose();
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      if (await onSave(routine)) onClose();
+      else setSaveError('Não foi possível salvar a ficha. Confira sua conexão e entre na sua conta.');
+    } catch {
+      setSaveError('Não foi possível salvar a ficha. Tente novamente.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filteredPickerExercises = searchExercises(
@@ -240,9 +276,11 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                           allowPreview={true}
                         />
                         <div>
-                          <h4 className="text-xs font-bold text-[#18201D] dark:text-white">
+                          <button type="button" onClick={() => onSelectExercise?.(item.exerciseId, item.exerciseName)}
+                            className="text-left text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                            title="Ver evolução deste exercício">
                             {item.exerciseName}
-                          </h4>
+                          </button>
                           <span className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] uppercase font-semibold">
                             {MUSCLE_CATEGORY_LABELS[item.category] || item.category}
                           </span>
@@ -267,11 +305,7 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                           min="1"
                           max="20"
                           value={item.targetSets}
-                          onChange={(e) =>
-                            handleUpdateExercise(idx, {
-                              targetSets: parseInt(e.target.value) || 1
-                            })
-                          }
+                          onChange={(e) => updateSetCount(idx, parseInt(e.target.value, 10) || 1)}
                           className="w-full mt-0.5 px-2 py-1 bg-white dark:bg-[#1E2623] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-lg text-xs font-bold text-center"
                         />
                       </div>
@@ -282,9 +316,16 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                         <input
                           type="text"
                           value={item.targetReps}
-                          onChange={(e) =>
-                            handleUpdateExercise(idx, { targetReps: e.target.value })
-                          }
+                          onChange={(e) => {
+                            const reps = e.target.value;
+                            handleUpdateExercise(idx, {
+                              targetReps: reps,
+                              sets: item.sets?.map((set) => ({
+                                ...set,
+                                targetReps: set.targetReps === item.targetReps ? reps : set.targetReps
+                              }))
+                            });
+                          }}
                           placeholder="8-12"
                           className="w-full mt-0.5 px-2 py-1 bg-white dark:bg-[#1E2623] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-lg text-xs font-bold text-center"
                         />
@@ -335,6 +376,34 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
                         </select>
                       </div>
                     </div>
+                    <div className="border-t border-[#AEBDB5]/20 dark:border-[#394842] pt-2 space-y-1.5">
+                      <div className="grid grid-cols-[2.5rem_1fr_1fr] gap-2 text-[10px] uppercase font-bold text-[#6F7C76] dark:text-[#A8B8B1] text-center">
+                        <span>Set</span><span>Carga alvo (kg)</span><span>Reps alvo</span>
+                      </div>
+                      {Array.from({ length: item.targetSets || 3 }, (_, setIndex) => {
+                        const set = item.sets?.[setIndex];
+                        const type = set?.type || 'normal';
+                        const nextType: Record<SetType, SetType> = { normal: 'warmup', warmup: 'failure', failure: 'dropset', dropset: 'normal' };
+                        return (
+                          <div key={setIndex} className="grid grid-cols-[2.5rem_1fr_1fr] gap-2 items-center rounded-xl bg-white dark:bg-[#1E2623] p-1.5">
+                            <button type="button" onClick={() => updateSet(idx, setIndex, { type: nextType[type] })}
+                              title={`Tipo: ${type}. Toque para alternar entre normal, aquecimento, falha e drop set`}
+                              className="h-8 rounded-lg bg-[#ECEFE7] dark:bg-[#34423C] text-xs font-black text-[#3F4B46] dark:text-white">
+                              {type === 'warmup' ? 'W' : type === 'failure' ? 'F' : type === 'dropset' ? 'D' : setIndex + 1}
+                            </button>
+                            <input type="number" min="0" step="0.5" aria-label={`Carga alvo da série ${setIndex + 1}`}
+                              value={set?.targetWeightKg ?? ''}
+                              onChange={(e) => updateSet(idx, setIndex, { targetWeightKg: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
+                              placeholder="—" className="w-full min-w-0 p-1.5 text-center rounded-lg bg-[#F7F4EE] dark:bg-[#232D29] text-xs" />
+                            <input type="text" aria-label={`Repetições alvo da série ${setIndex + 1}`}
+                              value={set?.targetReps ?? item.targetReps}
+                              onChange={(e) => updateSet(idx, setIndex, { targetReps: e.target.value })}
+                              className="w-full min-w-0 p-1.5 text-center rounded-lg bg-[#F7F4EE] dark:bg-[#232D29] text-xs" />
+                          </div>
+                        );
+                      })}
+                      <p className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1]">Toque no número: W aquecimento · F falha · D drop set.</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -344,6 +413,7 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
 
         {/* Footer */}
         <div className="p-4 border-t border-[#AEBDB5]/20 dark:border-[#394842] flex items-center justify-end gap-3 bg-[#F7F4EE]/50 dark:bg-[#18201D]/50">
+          {saveError && <p role="alert" className="text-xs text-red-600 flex-1">{saveError}</p>}
           <button
             type="button"
             onClick={onClose}
@@ -354,11 +424,12 @@ export const RoutineEditorModal: React.FC<RoutineEditorModalProps> = ({
           <button
             type="button"
             onClick={handleSave}
+            disabled={isSaving}
             className="px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-md active:scale-95 transition-transform flex items-center gap-1.5"
             style={{ backgroundColor: activeColor.primary }}
           >
             <Check className="w-4 h-4" />
-            Salvar Ficha
+            {isSaving ? 'Salvando...' : 'Salvar Ficha'}
           </button>
         </div>
       </div>
