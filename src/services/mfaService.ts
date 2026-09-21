@@ -49,7 +49,22 @@ export async function getMfaStatus(): Promise<{ required: boolean; verified: boo
 }
 
 export async function enrollTotp(): Promise<TotpEnrollment> {
-  const { data, error } = await client().auth.mfa.enroll({ factorType: 'totp', friendlyName: 'NutriFam' });
+  const supabase = client();
+  const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+  if (listError) throw listError;
+  if (factors.totp.length > 0) {
+    throw new Error('A2F já está ativa nesta conta. Atualize a tela para ver o fator cadastrado.');
+  }
+
+  // An interrupted enrollment reserves the friendly name but offers no usable
+  // second factor. Remove only this app's unverified attempt before starting over.
+  for (const pending of factors.all.filter((factor) =>
+    factor.factor_type === 'totp' && factor.status === 'unverified' && factor.friendly_name === 'NutriFam')) {
+    const { error: removeError } = await supabase.auth.mfa.unenroll({ factorId: pending.id });
+    if (removeError) throw removeError;
+  }
+
+  const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'NutriFam' });
   if (error) throw error;
   if (data.type !== 'totp') throw new Error('O Supabase não retornou um fator TOTP.');
   return { factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret };
