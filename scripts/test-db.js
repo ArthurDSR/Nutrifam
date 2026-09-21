@@ -35,8 +35,7 @@ async function runDatabaseTest() {
     process.exit(1);
   }
 
-  console.log(`🌐 URL do Supabase: ${url}`);
-  console.log(`🔑 Chave Anon: ${anonKey.slice(0, 15)}...${anonKey.slice(-8)}\n`);
+  console.log('🔐 Credenciais encontradas (valores ocultos).\n');
 
   const supabase = createClient(url, anonKey);
 
@@ -44,7 +43,9 @@ async function runDatabaseTest() {
     { name: 'profiles', label: 'Perfis de Usuários & Pet FoodBud' },
     { name: 'day_logs', label: 'Diário (Refeições, Água, Atividades, Missões)' },
     { name: 'weight_entries', label: 'Histórico de Pesagens & Biometria' },
-    { name: 'custom_foods', label: 'Alimentos e Receitas Personalizadas' }
+    { name: 'custom_foods', label: 'Alimentos e Receitas Personalizadas' },
+    { name: 'workout_routines', label: 'Fichas de treino' },
+    { name: 'completed_workouts', label: 'Histórico de treinos' }
   ];
 
   let allSuccess = true;
@@ -55,7 +56,7 @@ async function runDatabaseTest() {
     try {
       const { data, error } = await supabase.from(t.name).select('*').limit(1);
       if (error) {
-        if (error.code === '42P01' || error.message?.includes('schema cache')) {
+        if (error.code === '42P01' || error.code === 'PGRST205' || error.message?.includes('schema cache')) {
           console.log('❌ NÃO ENCONTRADA');
           missingTables.push(t.name);
           allSuccess = false;
@@ -107,17 +108,18 @@ async function runDatabaseTest() {
 
   console.log('\n---------------------------------------------------------');
   if (allSuccess) {
-    console.log('🎉 SUCESSO TOTAL! Seu banco de dados Supabase está 100% configurado e pronto!');
-    console.log('Todas as tabelas, permissões e sincronizações estão funcionando perfeitamente.\n');
+    console.log('✅ As tabelas verificadas estão acessíveis. Este teste não valida permissões de usuário autenticado.\n');
   } else {
-    console.log('⚠️ ATENÇÃO: O banco de dados está acessível, mas algumas tabelas ainda não foram criadas.');
+    console.log('⚠️ ATENÇÃO: Algumas tabelas estão ausentes ou inacessíveis.');
     console.log(`Tabelas pendentes: ${missingTables.join(', ')}`);
     console.log('\n👉 COMO RESOLVER EM 1 MINUTO:');
     console.log('1. Abra o painel do Supabase: https://supabase.com/dashboard');
     console.log('2. Clique no seu projeto e vá em "SQL Editor"');
-    console.log('3. Abra o arquivo "supabase/schema.sql" do projeto, copie todo o conteúdo e cole no SQL Editor');
+    console.log('3. Para tabelas de treino, execute supabase/migrations/20260918000000_create_workout_tables.sql no SQL Editor');
+    console.log('   Para a configuração inicial completa, execute supabase/schema.sql');
     console.log('4. Clique no botão verde "Run"');
     console.log('5. Rode este comando novamente (npm run test:db) para confirmar!\n');
+    process.exitCode = 1;
   }
 }
 

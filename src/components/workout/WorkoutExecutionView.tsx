@@ -9,7 +9,10 @@ import {
   Award,
   X,
   Search,
-  Timer
+  Timer,
+  ArrowUp,
+  ArrowDown,
+  RefreshCw
 } from 'lucide-react';
 import {
   WorkoutRoutine,
@@ -59,7 +62,7 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
         routineTitle: routine.title,
         startTime,
         exercises: routine.exercises.map((re) => {
-          const numSets = re.targetSets || (re.sets ? re.sets.length : 3);
+          const numSets = re.sets?.length || re.targetSets || 1;
           return {
             exerciseId: re.exerciseId,
             exerciseName: re.exerciseName,
@@ -72,7 +75,7 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
                 setNumber: idx + 1,
                 type: preset?.type || 'normal',
                 weightKg: preset?.targetWeightKg || 0,
-                reps: preset?.targetReps ? parseInt(preset.targetReps) || 10 : 10,
+                reps: preset?.targetReps ? parseInt(preset.targetReps, 10) || 0 : 0,
                 isCompleted: false
               };
             })
@@ -157,6 +160,7 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
 
   // Exercise Picker inside active workout
   const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
+  const [replacingExerciseIndex, setReplacingExerciseIndex] = useState<number | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
 
   // Finish confirmation modal
@@ -290,7 +294,7 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
             id: `set_${nextSetNum}_${Math.random().toString(36).substring(2, 5)}`,
             setNumber: nextSetNum,
             weightKg: lastSet ? lastSet.weightKg : 0,
-            reps: lastSet ? lastSet.reps : 10,
+            reps: 0,
             isCompleted: false
           };
           return { ...ex, sets: [...ex.sets, newSet] };
@@ -324,12 +328,21 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
     }
   };
 
+  const moveExercise = (index: number, direction: -1 | 1) => {
+    setSession((prev) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= prev.exercises.length) return prev;
+      const exercises = [...prev.exercises];
+      [exercises[index], exercises[nextIndex]] = [exercises[nextIndex], exercises[index]];
+      return { ...prev, exercises };
+    });
+  };
+
   const handleAddExerciseFromPicker = (ex: typeof EXERCISE_DATABASE[0]) => {
     setSession((prev) => ({
       ...prev,
-      exercises: [
-        ...prev.exercises,
-        {
+      exercises: (() => {
+        const nextExercise = {
           exerciseId: ex.id,
           exerciseName: ex.name,
           category: ex.category,
@@ -339,13 +352,19 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
               id: `set_1_${Math.random().toString(36).substring(2, 5)}`,
               setNumber: 1,
               weightKg: 0,
-              reps: 10,
+              reps: 0,
               isCompleted: false
             }
           ]
-        }
-      ]
+        };
+        return replacingExerciseIndex === null
+          ? [...prev.exercises, nextExercise]
+          : prev.exercises.map((item, index) => index === replacingExerciseIndex
+            ? { ...nextExercise, restSeconds: item.restSeconds, sets: item.sets }
+            : item);
+      })()
     }));
+    setReplacingExerciseIndex(null);
     setIsExercisePickerOpen(false);
   };
 
@@ -466,19 +485,19 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
                   />
                   <div className="min-w-0 flex-1">
                     <button type="button" onClick={() => setSelectedProgressExercise({ id: exercise.exerciseId, name: exercise.exerciseName })}
-                      className="text-left text-xs sm:text-sm font-black text-[#0080FF] dark:text-blue-400 truncate hover:underline w-full"
+                      className="text-left text-xs sm:text-sm font-black text-emerald-700 dark:text-emerald-400 truncate hover:underline w-full"
                       title="Ver evolução deste exercício">
                       {exercise.exerciseName}
                     </button>
                     <div className="flex items-center gap-1.5 mt-1">
-                      <Timer className="w-3.5 h-3.5 text-[#0080FF] shrink-0" />
+                      <Timer className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <span className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">Descanso:</span>
                       <select
                         value={exercise.restSeconds || 60}
                         onChange={(e) =>
                           handleAdjustExerciseRest(exIdx, parseInt(e.target.value) || 60, true)
                         }
-                        className="bg-blue-50 dark:bg-blue-950/40 text-[#0080FF] border border-blue-200 dark:border-blue-900/50 rounded-lg px-1 py-0.5 text-xs font-black font-mono focus:outline-none cursor-pointer"
+                        className="bg-[#ECEFE7] dark:bg-[#34423C] text-emerald-700 dark:text-emerald-300 border border-[#AEBDB5]/30 dark:border-[#394842] rounded-lg px-1 py-0.5 text-xs font-black font-mono focus:outline-none cursor-pointer"
                         title={`Tempo de descanso atual: ${formatMinutesSeconds(exercise.restSeconds || 60)} (até 5 min)`}
                       >
                         <option value={30}>00:30</option>
@@ -521,12 +540,17 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
                     </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-0.5 shrink-0">
+                <button type="button" onClick={() => moveExercise(exIdx, -1)} disabled={exIdx === 0} aria-label={`Mover ${exercise.exerciseName} para cima`} className="p-1.5 text-[#6F7C76] disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
+                <button type="button" onClick={() => moveExercise(exIdx, 1)} disabled={exIdx === session.exercises.length - 1} aria-label={`Mover ${exercise.exerciseName} para baixo`} className="p-1.5 text-[#6F7C76] disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
+                <button type="button" onClick={() => { setReplacingExerciseIndex(exIdx); setIsExercisePickerOpen(true); }} aria-label={`Substituir ${exercise.exerciseName}`} className="p-1.5 text-[#6F7C76]"><RefreshCw className="w-4 h-4" /></button>
                 <button
                   onClick={() => handleRemoveExercise(exIdx)}
                   className="p-1.5 text-slate-400 hover:text-red-500 rounded-xl transition-colors shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
+                </div>
               </div>
 
               {/* Set Table */}
@@ -680,7 +704,7 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
       {/* Persistent in-app rest notification. Closing other panels never stops it. */}
       {restDeadline !== null && (
         <div role="status" aria-live={restFinished ? 'assertive' : 'off'}
-          className="absolute bottom-4 left-3 right-3 z-40 max-w-md mx-auto bg-white dark:bg-[#25302B] border border-blue-200 dark:border-blue-900 rounded-2xl shadow-2xl overflow-hidden">
+          className="absolute bottom-4 left-3 right-3 z-40 max-w-md mx-auto bg-white dark:bg-[#25302B] border border-[#AEBDB5]/40 dark:border-[#394842] rounded-2xl shadow-xl overflow-hidden">
           <div className="px-3 pt-2 flex items-center justify-between text-[10px] font-semibold text-[#6F7C76] dark:text-[#A8B8B1]">
             <span className="truncate">{restFinished ? 'Descanso concluído · próxima série!' : `Descanso · ${restExerciseName}`}</span>
             <button type="button" onClick={() => setRestDeadline(null)} className="p-1" aria-label="Dispensar aviso de descanso"><X className="w-3.5 h-3.5" /></button>
@@ -689,9 +713,9 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
             <button type="button" onClick={() => adjustRest(-15)} className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#34423C] text-xs font-bold">-15s</button>
             <span className="font-mono font-black text-lg text-[#18201D] dark:text-white">{formatMinutesSeconds(restSecondsLeft)}</span>
             <button type="button" onClick={() => adjustRest(15)} className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#34423C] text-xs font-bold">+15s</button>
-            <button type="button" onClick={() => setRestDeadline(null)} className="px-2 py-1 rounded-lg bg-blue-600 text-white text-xs font-bold">Pular</button>
+            <button type="button" onClick={() => setRestDeadline(null)} className="px-2 py-1 rounded-lg text-white text-xs font-bold" style={{ backgroundColor: activeColor.primary }}>Pular</button>
           </div>
-          <div className="h-1 bg-blue-100 dark:bg-blue-950"><div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${Math.max(0, Math.min(100, (restSecondsLeft / restTotalSeconds) * 100))}%` }} /></div>
+          <div className="h-1 bg-[#ECEFE7] dark:bg-[#34423C]"><div className="h-full transition-all duration-500" style={{ backgroundColor: activeColor.primary, width: `${Math.max(0, Math.min(100, (restSecondsLeft / restTotalSeconds) * 100))}%` }} /></div>
         </div>
       )}
 
@@ -710,10 +734,10 @@ export const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
           <div className="w-full max-w-md bg-white dark:bg-[#1E2623] rounded-3xl max-h-[85vh] flex flex-col shadow-2xl border border-[#AEBDB5]/30 dark:border-[#394842] overflow-hidden">
             <div className="px-5 py-3.5 border-b border-[#AEBDB5]/20 dark:border-[#394842] flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#18201D] dark:text-white">
-                Adicionar Exercício ao Treino
+                {replacingExerciseIndex === null ? 'Adicionar exercício ao treino' : 'Substituir exercício'}
               </h3>
               <button
-                onClick={() => setIsExercisePickerOpen(false)}
+                onClick={() => { setIsExercisePickerOpen(false); setReplacingExerciseIndex(null); }}
                 className="p-1 rounded-full text-[#6F7C76] dark:text-[#A8B8B1]"
               >
                 <X className="w-4 h-4" />

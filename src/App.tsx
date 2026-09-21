@@ -24,6 +24,7 @@ import { SettingsModal } from './components/modals/SettingsModal';
 import { ScientificAssessmentModal } from './components/modals/ScientificAssessmentModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { TwoFactorModal } from './components/auth/TwoFactorModal';
+import { clearLegacyMfaData, getMfaStatus, verifyTotp } from './services/mfaService';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { OnboardingSurvey } from './components/onboarding/OnboardingSurvey';
 import { NativeHealthNoticeModal } from './components/health/NativeHealthNoticeModal';
@@ -76,7 +77,7 @@ import {
 
 export const App: React.FC = () => {
   // Global State
-  const [profile, setProfile] = useState(getStoredProfile);
+  const [profile, setProfile] = useState(() => { clearLegacyMfaData(); return getStoredProfile(); });
   const [dayLogs, setDayLogs] = useState(getStoredDayLogs);
   const [weightEntries, setWeightEntries] = useState(getStoredWeightEntries);
   const [customFoods, setCustomFoods] = useState(getStoredCustomFoods);
@@ -114,6 +115,11 @@ export const App: React.FC = () => {
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [showSplash, setShowSplash] = useState(() => getStoredProfile().showSplashAnimation !== false);
   const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
+  const [mfaGateUser, setMfaGateUser] = useState<AuthUser | null>(null);
+  const [mfaChecking, setMfaChecking] = useState(() => isSupabaseConfigured());
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [isSyncingHealth, setIsSyncingHealth] = useState(false);
   const [healthSyncToast, setHealthSyncToast] = useState<string | null>(null);
   const [isOnboardingSurveyOpen, setIsOnboardingSurveyOpen] = useState(false);
@@ -123,6 +129,23 @@ export const App: React.FC = () => {
   const cloudProfileOwnerRef = useRef<string | null>(null);
 
   const handleAuthSuccess = async (authUser: AuthUser) => {
+    let mfaEnabled = false;
+    if (isSupabaseConfigured()) {
+      try {
+        const status = await getMfaStatus();
+        mfaEnabled = Boolean(status.factorId);
+        if (status.required) {
+          setMfaGateUser(authUser);
+          setMfaFactorId(status.factorId || null);
+          return;
+        }
+      } catch {
+        setMfaGateUser(authUser);
+        setMfaError('Não foi possível verificar a A2F. Tente novamente.');
+        return;
+      }
+    }
+    setLocalAuthUser(authUser);
     setIsAuthModalOpen(false);
 
     // If Supabase is configured, check if this user already has an existing completed profile in Supabase
@@ -144,6 +167,7 @@ export const App: React.FC = () => {
             name: (remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ? remoteProfile.name : (authUser.name || remoteProfile.name),
             avatarText: (remoteProfile.name?.[0] || authUser.name?.[0] || 'A').toUpperCase(),
             avatarUrl: remoteProfile.avatarUrl,
+            isTwoFactorEnabled: mfaEnabled,
             isOnboardingCompleted: hasAccountData
           };
           cloudProfileOwnerRef.current = authUser.id;
@@ -190,7 +214,8 @@ export const App: React.FC = () => {
         id: authUser.id,
         email: authUser.email,
         name: authUser.name || baseProfile.name,
-        avatarText: (authUser.name?.[0] || baseProfile.name?.[0] || 'A').toUpperCase()
+        avatarText: (authUser.name?.[0] || baseProfile.name?.[0] || 'A').toUpperCase(),
+        isTwoFactorEnabled: mfaEnabled,
       };
       saveStoredProfile(updatedProfile);
       if (isSupabaseConfigured() && updatedProfile.isOnboardingCompleted && updatedProfile.currentWeightKg > 0) {
@@ -198,6 +223,28 @@ export const App: React.FC = () => {
       }
       return updatedProfile;
     });
+  };
+
+  const checkMfaBeforeProfile = async (authUser: AuthUser) => {
+    try {
+      const status = await getMfaStatus();
+      setProfile((prev) => ({ ...prev, isTwoFactorEnabled: Boolean(status.factorId) }));
+      if (status.required) {
+        setMfaFactorId(status.factorId || null);
+        setMfaGateUser(authUser);
+        setMfaChecking(false);
+        return;
+      }
+      setMfaGateUser(null);
+      setMfaFactorId(null);
+      await handleAuthSuccess(authUser);
+    } catch (error) {
+      setMfaGateUser(authUser);
+      setMfaFactorId(null);
+      setMfaError(error instanceof Error ? error.message : 'Não foi possível verificar a A2F.');
+    } finally {
+      setMfaChecking(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -244,19 +291,21 @@ export const App: React.FC = () => {
               provider: (u.app_metadata?.provider as any) || 'email',
               isEmailVerified: Boolean(u.email_confirmed_at)
             };
-            setLocalAuthUser(authUser);
-            handleAuthSuccess(authUser);
+            void checkMfaBeforeProfile(authUser);
 
             // Clean OAuth hash from browser address bar
             if (window.location.hash && window.location.hash.includes('access_token')) {
               window.history.replaceState({}, document.title, window.location.pathname);
             }
+          } else {
+            setMfaChecking(false);
           }
         }).catch((err) => {
           console.warn('Supabase getSession notice:', err);
+          setMfaChecking(false);
         });
 
-        const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
+        const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
           if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
             const u = session.user;
             const authUser: AuthUser = {
@@ -267,14 +316,15 @@ export const App: React.FC = () => {
               provider: (u.app_metadata?.provider as any) || 'email',
               isEmailVerified: Boolean(u.email_confirmed_at)
             };
-            setLocalAuthUser(authUser);
-            await handleAuthSuccess(authUser);
+            setTimeout(() => { void checkMfaBeforeProfile(authUser); }, 0);
 
             if (window.location.hash && window.location.hash.includes('access_token')) {
               window.history.replaceState({}, document.title, window.location.pathname);
             }
           } else if (event === 'SIGNED_OUT') {
             setLocalAuthUser(null);
+            setMfaGateUser(null);
+            setMfaChecking(false);
           }
         });
 
@@ -314,6 +364,9 @@ export const App: React.FC = () => {
           // Keep hasLoadedRemote false until sign-in occurs
           return;
         }
+
+        const mfaStatus = await getMfaStatus();
+        if (mfaStatus.required) return;
 
         hasLoadedRemote.current = true;
 
@@ -934,6 +987,33 @@ export const App: React.FC = () => {
     }
   };
 
+  if (mfaChecking) return <div className="min-h-dvh flex items-center justify-center bg-[#F7F4EE] dark:bg-[#18201D] text-sm text-[#3F4B46] dark:text-white">Verificando sua sessão...</div>;
+
+  if (mfaGateUser) return <div className="min-h-dvh flex items-center justify-center bg-[#F7F4EE] dark:bg-[#18201D] p-4">
+    <form onSubmit={async (event) => {
+      event.preventDefault();
+      setMfaError(null);
+      try {
+        const factorId = mfaFactorId || (await getMfaStatus()).factorId;
+        if (!factorId) throw new Error('Fator A2F não encontrado.');
+        await verifyTotp(factorId, mfaCode);
+        const user = mfaGateUser;
+        setMfaGateUser(null);
+        setMfaCode('');
+        await handleAuthSuccess(user);
+      } catch (error) {
+        setMfaError(error instanceof Error ? error.message : 'Código inválido ou expirado.');
+      }
+    }} className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#232D29] p-6 space-y-4 text-[#18201D] dark:text-white">
+      <h1 className="text-lg font-bold">Confirme seu segundo fator</h1>
+      <p className="text-xs text-[#6F7C76] dark:text-[#A8B8B1]">Abra seu aplicativo autenticador e digite o código de 6 dígitos para entrar.</p>
+      {mfaError && <p role="alert" className="text-xs text-rose-600">{mfaError}</p>}
+      <input value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" aria-label="Código de autenticação" className="w-full rounded-xl bg-[#F7F4EE] dark:bg-[#34423C] p-3 text-center font-mono text-lg tracking-widest" />
+      <button type="submit" disabled={mfaCode.length !== 6} className="w-full rounded-xl bg-emerald-700 py-3 text-xs font-bold text-white disabled:opacity-50">Verificar código</button>
+      <button type="button" onClick={async () => { await handleLogout(); setMfaGateUser(null); setMfaFactorId(null); setMfaError(null); setMfaCode(''); }} className="w-full text-xs text-[#6F7C76] dark:text-[#A8B8B1]">Sair da conta</button>
+    </form>
+  </div>;
+
   return (
     <MobileFrame>
       {!profile.isOnboardingCompleted || isOnboardingSurveyOpen ? (
@@ -1305,14 +1385,10 @@ export const App: React.FC = () => {
       <TwoFactorModal
         isOpen={isTwoFactorModalOpen}
         onClose={() => setIsTwoFactorModalOpen(false)}
-        userId={profile.id}
-        userEmail={profile.email}
-        isEnabled={Boolean(profile.isTwoFactorEnabled)}
-        onUpdateStatus={(enabled, secret) => {
+        onUpdateStatus={(enabled) => {
           setProfile((prev) => ({
             ...prev,
             isTwoFactorEnabled: enabled,
-            twoFactorSecret: secret
           }));
         }}
       />

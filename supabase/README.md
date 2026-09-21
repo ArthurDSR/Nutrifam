@@ -40,3 +40,14 @@ VITE_SUPABASE_ANON_KEY=eyJh...
 ```
 
 O aplicativo detectará as credenciais automaticamente e sincronizará em segundo plano.
+
+## A2F (TOTP)
+
+O app usa o MFA nativo do Supabase Auth. Depois de aplicar a migração de treinos,
+execute [`migrations/20260921000000_enforce_opt_in_mfa.sql`](./migrations/20260921000000_enforce_opt_in_mfa.sql)
+no SQL Editor. Ela acrescenta políticas restritivas às tabelas privadas: quem
+cadastrou um fator A2F verificado precisa de sessão `aal2` para ler ou alterar
+seus dados. Contas sem A2F continuam funcionando com `aal1`.
+
+A antiga configuração A2F guardada só no aparelho não é migrada: cada usuário
+precisa ativar novamente a A2F nas configurações para registrá-la no Supabase.

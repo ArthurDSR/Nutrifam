@@ -213,7 +213,7 @@ export async function finishAndSaveWorkout(
   // Persist directly to Supabase cloud
   const saved = await saveCompletedWorkoutToSupabase(completedWorkout, authenticatedUserId);
   if (!saved) {
-    throw new Error('Não foi possível salvar o treino no banco. Confira sua conexão e tente finalizar novamente.');
+    throw new Error('Não foi possível salvar o treino no banco. Verifique a conexão e a configuração das tabelas de treino no Supabase.');
   }
 
   return completedWorkout;

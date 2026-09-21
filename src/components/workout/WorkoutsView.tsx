@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Search,
   Share2,
-  Download
+  Download,
+  X
 } from 'lucide-react';
 import {
   WorkoutRoutine,
@@ -88,7 +89,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
       ]);
       if (loadedRoutines !== null) setRoutines(loadedRoutines);
       if (loadedHistory === null) {
-        setHistoryError(profile.id ? 'Não foi possível carregar o histórico. Verifique a conexão.' : 'Entre na sua conta para guardar e consultar o histórico.');
+        setHistoryError(profile.id ? 'Não foi possível carregar o histórico. Verifique a conexão e a configuração das tabelas de treino no Supabase.' : 'Entre na sua conta para guardar e consultar o histórico.');
       } else {
         setHistory(loadedHistory);
         setHistoryError(null);
@@ -379,7 +380,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                           {ex.exerciseName}
                         </span>
                         <span className="text-[#6F7C76] dark:text-[#A8B8B1] font-mono">
-                          {ex.targetSets}×{ex.targetReps}
+                          {ex.sets?.length || ex.targetSets} séries{ex.targetReps ? ` · ${ex.targetReps} reps` : ''}
                         </span>
                       </div>
                     ))}
@@ -442,7 +443,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                 key={item.id}
                 className="bg-white dark:bg-[#1E2623] rounded-3xl p-4 border border-[#AEBDB5]/20 dark:border-[#394842] shadow-2xs space-y-3"
               >
-                <div className="flex items-center justify-between">
+                <button type="button" onClick={() => setExpandedWorkoutId(item.id)} className="w-full flex items-center justify-between text-left group" aria-label={`Ver detalhes de ${item.title}`}>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-mono text-[#6F7C76] dark:text-[#A8B8B1] flex items-center gap-1">
@@ -455,7 +456,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                         {item.durationMinutes}m
                       </span>
                     </div>
-                    <h3 className="text-sm font-black text-[#18201D] dark:text-white mt-0.5">
+                    <h3 className="text-sm font-black text-[#18201D] dark:text-white mt-0.5 group-hover:text-emerald-600 transition-colors">
                       {item.title}
                     </h3>
                   </div>
@@ -470,17 +471,9 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                       Gasto Científico (MET)
                     </span>
                     </div>
-                    <button
-                      onClick={() => handleDeleteCompletedWorkout(item.id)}
-                      disabled={deletingWorkoutId === item.id}
-                      className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40"
-                      title="Excluir treino do histórico"
-                      aria-label="Excluir treino do histórico"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <ChevronRight className="w-4 h-4 text-[#6F7C76]" />
                   </div>
-                </div>
+                </button>
 
                 {/* Stats Bar */}
                 <div className="grid grid-cols-3 gap-2 p-2.5 bg-[#F7F4EE] dark:bg-[#232D29] rounded-2xl text-center">
@@ -510,37 +503,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                   </div>
                 </div>
 
-                <button type="button" onClick={() => setExpandedWorkoutId((prev) => prev === item.id ? null : item.id)}
-                  className="text-xs font-bold text-blue-600 dark:text-blue-400 w-full text-left py-1">
-                  {expandedWorkoutId === item.id ? 'Ocultar séries e exercícios ↑' : `Ver ${item.exercises.length} exercícios e séries ↓`}
-                </button>
-
-                {expandedWorkoutId === item.id && <div className="space-y-2 pt-1">
-                  {item.exercises.map((ex, exIdx) => (
-                    <div
-                      key={exIdx}
-                      className="text-xs p-3 rounded-xl bg-slate-50 dark:bg-[#202924] space-y-2"
-                    >
-                      <button type="button" onClick={() => setViewingExerciseDetail(searchExercises(ex.exerciseName).find((catalog) => catalog.id === ex.exerciseId) || {
-                        id: ex.exerciseId, name: ex.exerciseName, category: ex.category, equipment: 'other', targetMuscle: '', instructions: ''
-                      })} className="font-bold text-blue-600 dark:text-blue-400 text-left">
-                        {ex.exerciseName}
-                      </button>
-                      <div className="space-y-1">{ex.sets.map((set, idx) => (
-                        <div key={idx} className="flex justify-between font-mono text-[11px] text-[#3F4B46] dark:text-[#EDF2EF]">
-                          <span>{set.type === 'warmup' ? 'W' : set.type === 'failure' ? 'F' : set.type === 'dropset' ? 'D' : set.setNumber}</span>
-                          <span>{set.weightKg} kg × {set.reps} reps</span>
-                        </div>
-                      ))}</div>
-                    </div>
-                  ))}
-                </div>}
-
-                {item.notes && (
-                  <p className="text-[11px] italic text-[#6F7C76] dark:text-[#A8B8B1] border-l-2 border-emerald-500 pl-2">
-                    "{item.notes}"
-                  </p>
-                )}
+                <button type="button" onClick={() => setExpandedWorkoutId(item.id)} className="w-full py-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 text-left">Ver detalhes e séries →</button>
               </div>
             ))
           )}
@@ -640,6 +603,18 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
       )}
 
       {/* Routine Editor Modal */}
+      {history.find((item) => item.id === expandedWorkoutId) && (() => {
+        const item = history.find((workout) => workout.id === expandedWorkoutId)!;
+        return <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-2 sm:p-4" onClick={() => setExpandedWorkoutId(null)}>
+          <div role="dialog" aria-modal="true" aria-label={`Detalhes de ${item.title}`} className="w-full max-w-lg max-h-[92dvh] overflow-y-auto bg-white dark:bg-[#1E2623] rounded-3xl p-5 space-y-4" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3"><div><span className="text-[11px] font-mono text-[#6F7C76] dark:text-[#A8B8B1]">{item.date} · {item.durationMinutes} min</span><h2 className="text-lg font-black text-[#18201D] dark:text-white">{item.title}</h2></div><button onClick={() => setExpandedWorkoutId(null)} aria-label="Fechar detalhes" className="p-2 rounded-xl bg-[#F7F4EE] dark:bg-[#232D29]"><X className="w-5 h-5" /></button></div>
+            <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-[#F7F4EE] dark:bg-[#232D29] text-center text-xs font-bold"><span>{item.totalVolumeKg} kg<br />volume</span><span>{item.totalSets}<br />séries</span><span>{item.caloriesBurned}<br />kcal</span></div>
+            {item.exercises.map((ex, exIndex) => <section key={`${ex.exerciseId}-${exIndex}`} className="rounded-2xl bg-[#F7F4EE] dark:bg-[#232D29] p-3 space-y-2"><div className="flex items-center gap-2"><ExerciseThumbnail exerciseId={ex.exerciseId} category={ex.category} name={ex.exerciseName} size="sm" allowPreview={true} /><button type="button" onClick={() => setViewingExerciseDetail(searchExercises(ex.exerciseName).find((catalog) => catalog.id === ex.exerciseId) || { id: ex.exerciseId, name: ex.exerciseName, category: ex.category, equipment: 'other', targetMuscle: '', instructions: '' })} className="text-sm font-bold text-emerald-700 dark:text-emerald-400 text-left">{ex.exerciseName}</button></div><div className="grid grid-cols-[3rem_1fr_1fr] text-[10px] uppercase font-bold text-[#6F7C76] dark:text-[#A8B8B1]"><span>Série</span><span>Carga</span><span>Reps</span></div>{ex.sets.map((set, setIndex) => <div key={setIndex} className="grid grid-cols-[3rem_1fr_1fr] py-1.5 border-t border-[#AEBDB5]/30 dark:border-[#394842] text-xs font-mono text-[#18201D] dark:text-white"><span>{set.type === 'warmup' ? 'W' : set.type === 'failure' ? 'F' : set.type === 'dropset' ? 'D' : set.setNumber}</span><span>{set.weightKg} kg</span><span>{set.reps}</span></div>)}</section>)}
+            {item.notes && <p className="text-xs text-[#3F4B46] dark:text-[#EDF2EF]">{item.notes}</p>}
+            <button type="button" onClick={async () => { await handleDeleteCompletedWorkout(item.id); setExpandedWorkoutId(null); }} disabled={deletingWorkoutId === item.id} className="flex items-center gap-2 text-xs font-bold text-red-600 py-2"><Trash2 className="w-4 h-4" /> Excluir treino</button>
+          </div>
+        </div>;
+      })()}
       <RoutineEditorModal
         isOpen={isEditorOpen}
         initialRoutine={editingRoutine}

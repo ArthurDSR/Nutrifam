@@ -35,12 +35,12 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
   const handleToggleSetType = async (exIndex: number, setIndex: number) => {
     const updatedExercises = [...currentRoutine.exercises];
     const targetEx = { ...updatedExercises[exIndex] };
-    const numSets = targetEx.targetSets || 3;
+    const numSets = targetEx.sets?.length || targetEx.targetSets || 1;
 
     // ensure sets array exists
     const sets: RoutineExerciseSet[] = targetEx.sets && targetEx.sets.length > 0
       ? [...targetEx.sets]
-      : Array.from({ length: numSets }, () => ({ type: 'normal', targetReps: targetEx.targetReps }));
+      : Array.from({ length: numSets }, () => ({ type: 'normal', targetReps: targetEx.targetReps || '' }));
 
     const currentType = sets[setIndex]?.type || 'normal';
     const cycle: SetType[] = ['normal', 'warmup', 'failure', 'dropset'];
@@ -152,12 +152,12 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
         {/* Routine Exercises List (Hevy Style) */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 divide-y divide-[#AEBDB5]/15 dark:divide-[#394842]/50">
           {currentRoutine.exercises.map((ex, exIndex) => {
-            const numSets = ex.targetSets || (ex.sets ? ex.sets.length : 3);
+            const numSets = ex.sets?.length || ex.targetSets || 1;
             const setsList: RoutineExerciseSet[] = ex.sets && ex.sets.length > 0
               ? ex.sets
               : Array.from({ length: numSets }, () => ({
                   type: 'normal',
-                  targetReps: ex.targetReps || '10',
+                  targetReps: ex.targetReps || '',
                   targetWeightKg: undefined
                 }));
 
@@ -289,7 +289,7 @@ export const RoutineDetailModal: React.FC<RoutineDetailModalProps> = ({
 
                           {/* REPS */}
                           <div className="text-sm font-semibold text-[#18201D] dark:text-slate-200">
-                            {set.targetReps || ex.targetReps || '10'}
+                            {set.targetReps || ex.targetReps || '—'}
                           </div>
                         </div>
                       );

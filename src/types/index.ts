@@ -96,7 +96,6 @@ export interface UserProfile {
   equippedClothes?: string | null;
   showSplashAnimation?: boolean;
   isTwoFactorEnabled?: boolean;
-  twoFactorSecret?: string;
   isEmailVerified?: boolean;
   language?: 'pt' | 'en' | 'es';
   healthProvider?: 'apple_health' | 'google_fit' | 'health_connect' | 'none';

@@ -21,10 +21,9 @@ import {
   requestPasswordReset,
   resendVerificationEmail,
   verifyEmailOtp,
-  checkRequiresTwoFactor,
-  verifyTwoFactorCode,
   AuthUser
 } from '../../services/authService';
+import { getMfaStatus, verifyTotp } from '../../services/mfaService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { useTheme } from '../../services/themeService';
 
@@ -57,7 +56,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isA2FChallenge, setIsA2FChallenge] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [pendingAuthUser, setPendingAuthUser] = useState<AuthUser | null>(null);
-  const [pendingSecret, setPendingSecret] = useState<string | undefined>(undefined);
+  const [pendingFactorId, setPendingFactorId] = useState<string | null>(null);
 
   // Email Verification State
   const [isVerifyEmailMode, setIsVerifyEmailMode] = useState(false);
@@ -130,8 +129,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      const isValid = await verifyTwoFactorCode(twoFactorCode, pendingSecret);
-      if (isValid) {
+      setIsLoading(true);
+      try {
+        if (!pendingFactorId) throw new Error('Fator A2F não encontrado. Entre novamente.');
+        await verifyTotp(pendingFactorId, twoFactorCode);
+        setIsLoading(false);
         setSuccessMsg('Autenticação de Dois Fatores confirmada!');
         setTimeout(() => {
           if (pendingAuthUser) {
@@ -139,8 +141,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           }
           onClose();
         }, 700);
-      } else {
-        setErrorMsg('Código A2F incorreto ou expirado. Verifique o código no seu aplicativo autenticador.');
+      } catch (error) {
+        setIsLoading(false);
+        setErrorMsg(error instanceof Error ? error.message : 'Código A2F incorreto ou expirado.');
       }
       return;
     }
@@ -218,13 +221,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     if (res.success && res.user) {
       // Check if user has A2F enabled
-      const a2fCheck = checkRequiresTwoFactor(email);
-      if (a2fCheck.required) {
-        setPendingAuthUser(res.user);
-        setPendingSecret(a2fCheck.secret);
-        setIsA2FChallenge(true);
-        setSuccessMsg('Por favor, confirme seu código de dois fatores (A2F).');
-        return;
+      if (isSupabase) {
+        try {
+          const status = await getMfaStatus();
+          if (status.required && status.factorId) {
+            setPendingAuthUser(res.user);
+            setPendingFactorId(status.factorId);
+            setIsA2FChallenge(true);
+            setSuccessMsg('Confirme seu código de dois fatores.');
+            return;
+          }
+          if (status.required) {
+            setErrorMsg('Há um segundo fator cadastrado que este app não consegue verificar. Contate o suporte.');
+            return;
+          }
+        } catch (error) {
+          setErrorMsg(error instanceof Error ? error.message : 'Não foi possível verificar a A2F.');
+          return;
+        }
       }
 
       setSuccessMsg(res.message);
