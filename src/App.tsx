@@ -73,7 +73,35 @@ import {
   loadWeightEntriesFromSupabase,
   loadCustomFoodsFromSupabase
 } from './services/supabaseClient';
-import { queueChange, flushPendingChanges, getPendingChanges, hasPendingChange } from './services/offlineSync';
+import { queueChange, flushPendingChanges, getPendingChanges, getSyncConflicts, getSyncConflictCount, hasPendingChange } from './services/offlineSync';
+
+const CLOUD_PROFILE_FIELDS: (keyof UserProfile)[] = [
+  'name', 'avatarText', 'avatarUrl', 'goalType', 'heightCm', 'startWeightKg',
+  'currentWeightKg', 'goalWeightKg', 'dailyCaloriesTarget', 'targetMacros',
+  'gems', 'burnedCalories', 'appleHealthSynced', 'gender', 'age', 'activityLevel',
+  'weeklyPaceKg', 'petLevel', 'petXp', 'petMood', 'petName', 'inventory',
+  'equippedCap', 'equippedGlasses', 'equippedClothes', 'showSplashAnimation',
+  'isOnboardingCompleted'
+];
+
+type AccountSnapshot = {
+  profile: string | null;
+  logs: Record<string, string>;
+  weights: Record<string, string>;
+  foods: Record<string, string>;
+};
+
+const emptyAccountSnapshot = (): AccountSnapshot => ({ profile: null, logs: {}, weights: {}, foods: {} });
+
+function readCloudSnapshot(userId: string): AccountSnapshot {
+  try {
+    return { ...emptyAccountSnapshot(), ...JSON.parse(localStorage.getItem(`nutrifam_cloud_snapshot_${userId}`) || '{}') };
+  } catch { return emptyAccountSnapshot(); }
+}
+
+function writeCloudSnapshot(userId: string, snapshot: AccountSnapshot): void {
+  localStorage.setItem(`nutrifam_cloud_snapshot_${userId}`, JSON.stringify(snapshot));
+}
 
 export const App: React.FC = () => {
   // Global State
@@ -82,8 +110,10 @@ export const App: React.FC = () => {
   const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([]);
   const [customFoods, setCustomFoods] = useState<FoodItem[]>([]);
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
+  const [syncConflictCount, setSyncConflictCount] = useState(0);
   const authEpochRef = useRef(0);
   const baselineRef = useRef<{ profile: string; logs: Record<string, string>; weights: Record<string, string>; foods: Record<string, string> } | null>(null);
+  const cloudBaselineRef = useRef<AccountSnapshot>(emptyAccountSnapshot());
 
   const [selectedDate, setSelectedDate] = useState(getTodayDateString);
   const [activeTab, setActiveTab] = useState<ActiveTab>('journal');
@@ -122,6 +152,7 @@ export const App: React.FC = () => {
   const [mfaChecking, setMfaChecking] = useState(() => isSupabaseConfigured());
   const [mfaCode, setMfaCode] = useState('');
   const [mfaError, setMfaError] = useState<string | null>(null);
+  const [authLoadError, setAuthLoadError] = useState<string | null>(null);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [isSyncingHealth, setIsSyncingHealth] = useState(false);
   const [healthSyncToast, setHealthSyncToast] = useState<string | null>(null);
@@ -139,14 +170,30 @@ export const App: React.FC = () => {
     };
   };
 
+  const rememberCloudBaseline = (userId: string, nextProfile: UserProfile, logs: typeof dayLogs, weights: WeightEntry[], foods: FoodItem[]) => {
+    const snapshot: AccountSnapshot = {
+      profile: JSON.stringify(nextProfile),
+      logs: Object.fromEntries(Object.entries(logs).map(([date, log]) => [date, JSON.stringify(log)])),
+      weights: Object.fromEntries(weights.map((entry) => [entry.id, JSON.stringify(entry)])),
+      foods: Object.fromEntries(foods.map((food) => [food.id, JSON.stringify(food)]))
+    };
+    cloudBaselineRef.current = snapshot;
+    writeCloudSnapshot(userId, snapshot);
+  };
+
   const handleAuthSuccess = async (authUser: AuthUser) => {
     const epoch = ++authEpochRef.current;
+    setAuthLoadError(null);
     let mfaEnabled = false;
     if (!isSupabaseConfigured()) return;
     if (navigator.onLine) {
       const client = getSupabase();
       const { data, error } = await client!.auth.getUser();
-      if (error || data.user?.id !== authUser.id) return;
+      if (error || data.user?.id !== authUser.id) {
+        setAuthLoadError('Esta sessão não foi confirmada pelo Supabase. Entre novamente na conta correta.');
+        setMfaChecking(false);
+        return;
+      }
       try {
         const status = await getMfaStatus();
         mfaEnabled = Boolean(status.factorId);
@@ -156,14 +203,14 @@ export const App: React.FC = () => {
           return;
         }
       } catch {
-        setMfaGateUser(authUser);
-        setMfaError('Não foi possível verificar a A2F. Tente novamente.');
+        setAuthLoadError('Não foi possível verificar a A2F. Tente novamente com conexão ativa.');
         return;
       }
     }
     else if (localStorage.getItem('nutrifam_verified_account_id') !== authUser.id) return;
     if (epoch !== authEpochRef.current) return;
     migrateLegacyAccountCache(authUser.id);
+    cloudBaselineRef.current = readCloudSnapshot(authUser.id);
     setLocalAuthUser(authUser);
     if (navigator.onLine) localStorage.setItem('nutrifam_verified_account_id', authUser.id);
     setIsAuthModalOpen(false);
@@ -176,50 +223,75 @@ export const App: React.FC = () => {
     const cachedLogs = getStoredDayLogs(authUser.id);
     const cachedWeights = getStoredWeightEntries(authUser.id);
     const cachedFoods = getStoredCustomFoods(authUser.id);
-    rememberBaseline(cachedProfile, cachedLogs, cachedWeights, cachedFoods);
-    cloudProfileOwnerRef.current = authUser.id;
-    setProfile(cachedProfile);
-    setDayLogs(cachedLogs);
-    setWeightEntries(cachedWeights);
-    setCustomFoods(cachedFoods);
-    setActiveUserId(authUser.id);
-    setMfaChecking(false);
-    if (!navigator.onLine) return;
-    await flushPendingChanges(authUser.id);
+    if (!navigator.onLine) {
+      rememberBaseline(cachedProfile, cachedLogs, cachedWeights, cachedFoods);
+      cloudProfileOwnerRef.current = authUser.id;
+      setProfile(cachedProfile);
+      setDayLogs(cachedLogs);
+      setWeightEntries(cachedWeights);
+      setCustomFoods(cachedFoods);
+      setActiveUserId(authUser.id);
+      setSyncConflictCount(getSyncConflictCount(authUser.id));
+      setMfaChecking(false);
+      return;
+    }
+    setMfaChecking(true);
     try {
+      const client = getSupabase();
+      if (!client) throw new Error('Supabase indisponível.');
+      // The signup trigger runs only when auth.users is created. A manually
+      // deleted profile must be recreated from server defaults, never cache.
+      const { data: profileRow, error: lookupError } = await client.from('profiles')
+        .select('id').eq('id', authUser.id).maybeSingle();
+      if (lookupError) throw lookupError;
+      if (!profileRow) {
+        const { error: createError } = await client.from('profiles').insert({
+          id: authUser.id,
+          name: authUser.name || 'Meu Perfil',
+          email: authUser.email,
+          avatar_text: (authUser.name?.[0] || 'M').toUpperCase()
+        });
+        if (createError && createError.code !== '23505') throw createError;
+      }
+      await flushPendingChanges(authUser.id);
       const [remoteProfile, remoteLogs, remoteWeights, remoteFoods] = await Promise.all([
         loadProfileFromSupabase(authUser.id), loadDayLogsFromSupabase(authUser.id),
         loadWeightEntriesFromSupabase(authUser.id), loadCustomFoodsFromSupabase(authUser.id)
       ]);
       if (epoch !== authEpochRef.current) return;
-      const pending = getPendingChanges(authUser.id);
-      const nextProfile = remoteProfile && !hasPendingChange(authUser.id, 'profile')
-        ? { ...cachedProfile, ...remoteProfile, avatarUrl: remoteProfile.avatarUrl, id: authUser.id, isTwoFactorEnabled: mfaEnabled }
-        : cachedProfile;
-      const nextLogs = { ...cachedLogs, ...(remoteLogs || {}) };
-      for (const change of pending) if (change.kind === 'dayLog') nextLogs[change.value.date] = change.value;
-      const nextWeights = remoteWeights || cachedWeights;
-      for (const change of pending) if (change.kind === 'weight') {
-        const index = nextWeights.findIndex((entry) => entry.id === change.value.id);
-        if (index >= 0) nextWeights[index] = change.value; else nextWeights.push(change.value);
+      if (!remoteProfile || remoteLogs === null || remoteWeights === null || remoteFoods === null) {
+        throw new Error('Não foi possível confirmar os dados desta conta no Supabase.');
       }
-      const nextFoods = remoteFoods || cachedFoods;
-      for (const change of pending) if (change.kind === 'food') {
-        const index = nextFoods.findIndex((food) => food.id === change.value.id);
-        if (index >= 0) nextFoods[index] = change.value; else nextFoods.push(change.value);
-      }
+      const nextProfile: UserProfile = {
+        ...DEFAULT_PROFILE, ...remoteProfile, id: authUser.id,
+        email: authUser.email, isTwoFactorEnabled: mfaEnabled
+      };
+      const nextLogs = remoteLogs;
+      const nextWeights = remoteWeights;
+      const nextFoods = remoteFoods;
       rememberBaseline(nextProfile, nextLogs, nextWeights, nextFoods);
+      rememberCloudBaseline(authUser.id, nextProfile, nextLogs, nextWeights, nextFoods);
       setProfile(nextProfile);
       setDayLogs(nextLogs);
       setWeightEntries([...nextWeights]);
       setCustomFoods([...nextFoods]);
+      cloudProfileOwnerRef.current = authUser.id;
+      setActiveUserId(authUser.id);
+      setSyncConflictCount(getSyncConflictCount(authUser.id));
+      setMfaChecking(false);
       if (nextProfile.isOnboardingCompleted) setIsOnboardingSurveyOpen(false);
     } catch (error) {
-      console.warn('Dados locais mantidos até a próxima sincronização:', error);
+      console.warn('Não foi possível confirmar os dados no Supabase:', error);
+      if (epoch === authEpochRef.current) {
+        setAuthLoadError('Não foi possível carregar os dados da conta. Nada do aparelho foi enviado como substituto. Verifique a conexão e tente novamente.');
+        setMfaChecking(false);
+      }
     }
   };
 
   const checkMfaBeforeProfile = async (authUser: AuthUser) => {
+    setMfaGateUser(null);
+    setMfaError(null);
     try {
       const status = await getMfaStatus();
       if (status.required) {
@@ -232,9 +304,7 @@ export const App: React.FC = () => {
       setMfaFactorId(null);
       await handleAuthSuccess(authUser);
     } catch (error) {
-      setMfaGateUser(authUser);
-      setMfaFactorId(null);
-      setMfaError(error instanceof Error ? error.message : 'Não foi possível verificar a A2F.');
+      setAuthLoadError(error instanceof Error ? error.message : 'Não foi possível verificar a A2F.');
     } finally {
       setMfaChecking(false);
     }
@@ -243,7 +313,9 @@ export const App: React.FC = () => {
   const handleLogout = async () => {
     ++authEpochRef.current;
     setActiveUserId(null);
+    setSyncConflictCount(0);
     baselineRef.current = null;
+    cloudBaselineRef.current = emptyAccountSnapshot();
     cloudProfileOwnerRef.current = null;
     setProfile({ ...DEFAULT_PROFILE });
     setDayLogs({});
@@ -253,6 +325,7 @@ export const App: React.FC = () => {
     setIsSettingsOpen(false);
     setIsEditProfileOpen(false);
     setMfaGateUser(null);
+    setAuthLoadError(null);
     localStorage.removeItem('nutrifam_verified_account_id');
     await logoutAccount();
   };
@@ -308,7 +381,9 @@ export const App: React.FC = () => {
             setMfaChecking(false);
             ++authEpochRef.current;
             setActiveUserId(null);
+            setSyncConflictCount(0);
             baselineRef.current = null;
+            cloudBaselineRef.current = emptyAccountSnapshot();
             setProfile({ ...DEFAULT_PROFILE });
             setDayLogs({});
             setWeightEntries([]);
@@ -342,9 +417,23 @@ export const App: React.FC = () => {
     saveStoredProfile(profile);
     const serialized = JSON.stringify(profile);
     if (baselineRef.current.profile !== serialized) {
+      const previous = JSON.parse(baselineRef.current.profile) as UserProfile;
+      const cloudBase = cloudBaselineRef.current.profile
+        ? JSON.parse(cloudBaselineRef.current.profile) as UserProfile
+        : null;
+      const values: Partial<UserProfile> = {};
+      const base: Partial<UserProfile> = {};
+      for (const field of CLOUD_PROFILE_FIELDS) {
+        if (JSON.stringify(previous[field]) !== JSON.stringify(profile[field])) {
+          Object.assign(values, { [field]: profile[field] });
+          Object.assign(base, { [field]: cloudBase?.[field] });
+        }
+      }
       baselineRef.current.profile = serialized;
-      queueChange(activeUserId, { kind: 'profile', value: profile });
-      void flushPendingChanges(activeUserId);
+      if (Object.keys(values).length) {
+        queueChange(activeUserId, { kind: 'profilePatch', values, base });
+        void flushPendingChanges(activeUserId);
+      }
     }
   }, [profile, activeUserId]);
 
@@ -356,10 +445,20 @@ export const App: React.FC = () => {
     const refreshProfileFromCloud = async () => {
       if (document.visibilityState === 'hidden') return;
       await flushPendingChanges(activeUserId);
-      if (hasPendingChange(activeUserId, 'profile')) return;
-      const remoteProfile = await loadProfileFromSupabase(activeUserId);
-      if (!cancelled && remoteProfile) {
-        cloudProfileOwnerRef.current = activeUserId;
+      const [remoteProfile, remoteLogs, remoteWeights, remoteFoods] = await Promise.all([
+        loadProfileFromSupabase(activeUserId), loadDayLogsFromSupabase(activeUserId),
+        loadWeightEntriesFromSupabase(activeUserId), loadCustomFoodsFromSupabase(activeUserId)
+      ]);
+      if (cancelled) return;
+      const snapshot: AccountSnapshot = {
+        profile: remoteProfile ? JSON.stringify(remoteProfile) : cloudBaselineRef.current.profile,
+        logs: remoteLogs === null ? cloudBaselineRef.current.logs : Object.fromEntries(Object.entries(remoteLogs).map(([date, log]) => [date, JSON.stringify(log)])),
+        weights: remoteWeights === null ? cloudBaselineRef.current.weights : Object.fromEntries(remoteWeights.map((entry) => [entry.id, JSON.stringify(entry)])),
+        foods: remoteFoods === null ? cloudBaselineRef.current.foods : Object.fromEntries(remoteFoods.map((food) => [food.id, JSON.stringify(food)]))
+      };
+      cloudBaselineRef.current = snapshot;
+      writeCloudSnapshot(activeUserId, snapshot);
+      if (remoteProfile && !hasPendingChange(activeUserId, 'profile')) {
         setProfile((prev) => {
           const refreshedProfile = {
             ...prev,
@@ -372,13 +471,40 @@ export const App: React.FC = () => {
           return refreshedProfile;
         });
       }
+      if (remoteLogs !== null) {
+        setDayLogs((prev) => {
+          const next = { ...prev };
+          for (const [date, log] of Object.entries(remoteLogs)) {
+            if (!hasPendingChange(activeUserId, `dayLog:${date}`)) next[date] = log;
+          }
+          if (baselineRef.current) baselineRef.current.logs = Object.fromEntries(
+            Object.entries(next).map(([date, log]) => [date, JSON.stringify(log)]));
+          return next;
+        });
+      }
+      if (remoteWeights !== null && !getPendingChanges(activeUserId).some((change) => change.kind === 'weight')) {
+        if (baselineRef.current) baselineRef.current.weights = Object.fromEntries(remoteWeights.map((entry) => [entry.id, JSON.stringify(entry)]));
+        setWeightEntries(remoteWeights);
+      }
+      if (remoteFoods !== null && !getPendingChanges(activeUserId).some((change) => change.kind === 'food')) {
+        if (baselineRef.current) baselineRef.current.foods = Object.fromEntries(remoteFoods.map((food) => [food.id, JSON.stringify(food)]));
+        setCustomFoods(remoteFoods);
+      }
     };
 
+    const refreshAfterSync = (event: Event) => {
+      if ((event as CustomEvent<{ userId: string }>).detail?.userId === activeUserId) {
+        setSyncConflictCount(getSyncConflictCount(activeUserId));
+        void refreshProfileFromCloud();
+      }
+    };
     window.addEventListener('focus', refreshProfileFromCloud);
+    window.addEventListener('nutrifam:sync-complete', refreshAfterSync);
     document.addEventListener('visibilitychange', refreshProfileFromCloud);
     return () => {
       cancelled = true;
       window.removeEventListener('focus', refreshProfileFromCloud);
+      window.removeEventListener('nutrifam:sync-complete', refreshAfterSync);
       document.removeEventListener('visibilitychange', refreshProfileFromCloud);
     };
   }, [activeUserId]);
@@ -389,8 +515,9 @@ export const App: React.FC = () => {
     for (const [date, log] of Object.entries(dayLogs)) {
       const serialized = JSON.stringify(log);
       if (baselineRef.current.logs[date] !== serialized) {
+        const base = cloudBaselineRef.current.logs[date] ? JSON.parse(cloudBaselineRef.current.logs[date]) : null;
         baselineRef.current.logs[date] = serialized;
-        queueChange(activeUserId, { kind: 'dayLog', value: log });
+        queueChange(activeUserId, { kind: 'dayLog', value: log, base });
       }
     }
     void flushPendingChanges(activeUserId);
@@ -402,8 +529,9 @@ export const App: React.FC = () => {
     for (const entry of weightEntries) {
       const serialized = JSON.stringify(entry);
       if (baselineRef.current.weights[entry.id] !== serialized) {
+        const base = cloudBaselineRef.current.weights[entry.id] ? JSON.parse(cloudBaselineRef.current.weights[entry.id]) : null;
         baselineRef.current.weights[entry.id] = serialized;
-        queueChange(activeUserId, { kind: 'weight', value: entry });
+        queueChange(activeUserId, { kind: 'weight', value: entry, base });
       }
     }
     void flushPendingChanges(activeUserId);
@@ -415,8 +543,9 @@ export const App: React.FC = () => {
     for (const food of customFoods) {
       const serialized = JSON.stringify(food);
       if (baselineRef.current.foods[food.id] !== serialized) {
+        const base = cloudBaselineRef.current.foods[food.id] ? JSON.parse(cloudBaselineRef.current.foods[food.id]) : null;
         baselineRef.current.foods[food.id] = serialized;
-        queueChange(activeUserId, { kind: 'food', value: food });
+        queueChange(activeUserId, { kind: 'food', value: food, base });
       }
     }
     void flushPendingChanges(activeUserId);
@@ -713,6 +842,17 @@ export const App: React.FC = () => {
     }
   };
 
+  const exportSyncConflicts = () => {
+    if (!activeUserId) return;
+    const data = JSON.stringify(getSyncConflicts(activeUserId), null, 2);
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `nutrifam-conflitos-${activeUserId}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const handleWorkoutDeleted = (workout: CompletedWorkout) => {
     const log = dayLogs[workout.date];
     if (!log) return;
@@ -800,7 +940,8 @@ export const App: React.FC = () => {
     setWeightEntries((prev) => [...prev, newEntry]);
     setProfile((prev) => ({
       ...prev,
-      currentWeightKg: weight,
+      // Uma pesagem retroativa compõe o histórico, mas não substitui o peso atual.
+      ...(date === getTodayDateString() ? { currentWeightKg: weight } : {}),
       gems: prev.gems + 30
     }));
 
@@ -906,16 +1047,16 @@ export const App: React.FC = () => {
   // Complete onboarding from interactive survey
   const handleCompleteOnboarding = (
     completedProfile: UserProfile,
-    initialWeight: number,
-    authUser?: AuthUser
+    initialWeight: number
   ) => {
+    if (!activeUserId || profile.id !== activeUserId) return;
     setIsOnboardingSurveyOpen(false);
 
     // 1. Update Profile
     const finalProfile: UserProfile = {
       ...completedProfile,
-      id: authUser?.id || completedProfile.id || profile.id,
-      email: authUser?.email || completedProfile.email || profile.email,
+      id: activeUserId,
+      email: profile.email,
       isOnboardingCompleted: true
     };
     setProfile(finalProfile);
@@ -999,6 +1140,8 @@ export const App: React.FC = () => {
     <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#232D29] p-6 text-center text-[#18201D] dark:text-white shadow-lg">
       <h1 className="text-2xl font-bold">NutriFam</h1>
       <p className="mt-3 text-sm text-[#6F7C76] dark:text-[#A8B8B1]">Entre na sua conta para acessar seus dados. Depois do primeiro acesso, você poderá continuar usando o app sem internet.</p>
+      {authLoadError && <p role="alert" className="mt-4 text-sm text-rose-600">{authLoadError}</p>}
+      {authLoadError && <button type="button" onClick={() => window.location.reload()} className="mt-3 text-sm font-bold text-emerald-700">Tentar novamente</button>}
       {!isSupabaseConfigured() && <p role="alert" className="mt-4 text-sm text-rose-600">A autenticação não está configurada neste dispositivo.</p>}
       <button type="button" disabled={!isSupabaseConfigured()} onClick={() => { setAuthModalMode('login'); setIsAuthModalOpen(true); }} className="mt-6 w-full rounded-xl bg-emerald-700 py-3 font-bold text-white disabled:opacity-50">Entrar</button>
       <button type="button" disabled={!isSupabaseConfigured()} onClick={() => { setAuthModalMode('register'); setIsAuthModalOpen(true); }} className="mt-3 w-full rounded-xl border border-emerald-700 py-3 font-bold text-emerald-700 disabled:opacity-50">Criar conta</button>
@@ -1008,8 +1151,13 @@ export const App: React.FC = () => {
 
   return (
     <MobileFrame>
+      {syncConflictCount > 0 && <div role="alert" className="mx-3 mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100">
+        {syncConflictCount} alteração(ões) local(is) em conflito não foram enviadas. O valor do servidor foi mantido; os dados locais seguem preservados neste aparelho.
+        <button type="button" onClick={exportSyncConflicts} className="mt-1 block font-bold underline">Exportar cópia das alterações</button>
+      </div>}
       {!profile.isOnboardingCompleted || isOnboardingSurveyOpen ? (
         <OnboardingSurvey
+          key={activeUserId}
           onComplete={handleCompleteOnboarding}
           existingProfile={profile}
           isRedoing={isOnboardingSurveyOpen && Boolean(profile.isOnboardingCompleted)}
@@ -1287,6 +1435,14 @@ export const App: React.FC = () => {
           profile={profile}
           onClose={() => setIsEditProfileOpen(false)}
           onSaveProfile={(updated) => {
+            if (updated.currentWeightKg > 0 && updated.currentWeightKg !== profile.currentWeightKg) {
+              setWeightEntries((prev) => [...prev, {
+                id: 'w_' + Date.now(),
+                date: getTodayDateString(),
+                weightKg: updated.currentWeightKg,
+                note: 'Atualização do perfil'
+              }]);
+            }
             setProfile(updated);
             if (updated.dailyCaloriesTarget) {
               updateCurrentDayLog(syncDayLogMealTargets(currentDayLog, updated.dailyCaloriesTarget));

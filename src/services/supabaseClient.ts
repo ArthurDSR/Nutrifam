@@ -42,8 +42,11 @@ export function getSupabaseCredentials(): { url: string; anonKey: string } {
   const localUrl = localStorage.getItem(STORAGE_URL_KEY) || localStorage.getItem(LEGACY_STORAGE_URL_KEY) || '';
   const localKey = localStorage.getItem(STORAGE_KEY_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY_KEY) || '';
 
-  const url = (localUrl || envUrl || '').trim();
-  const anonKey = (localKey || envKey || '').trim();
+  // A deployed build must never silently switch projects because an older
+  // version left different credentials in this browser's localStorage.
+  const useBundled = Boolean(envUrl && envKey);
+  const url = (useBundled ? envUrl : localUrl).trim();
+  const anonKey = (useBundled ? envKey : localKey).trim();
 
   return { url, anonKey };
 }
@@ -163,12 +166,6 @@ export async function loadProfileFromSupabase(userId?: string): Promise<UserProf
     const goalWeight = Number(data.goal_weight_kg) || 0;
     const startWeight = Number(data.start_weight_kg) || currentWeight || 0;
 
-    const hasAccountData =
-      Boolean(data.is_onboarding_completed) ||
-      (currentWeight > 0) ||
-      Boolean(data.name && data.name !== 'Meu Perfil') ||
-      Boolean(data.avatar_url);
-
     return {
       id: data.id,
       email: data.email,
@@ -204,7 +201,7 @@ export async function loadProfileFromSupabase(userId?: string): Promise<UserProf
       equippedClothes: data.equipped_clothes !== undefined ? data.equipped_clothes : null,
       showSplashAnimation: data.show_splash_animation !== undefined ? Boolean(data.show_splash_animation) : true,
       geminiApiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || '',
-      isOnboardingCompleted: Boolean(data.is_onboarding_completed) || hasAccountData
+      isOnboardingCompleted: Boolean(data.is_onboarding_completed)
     };
   } catch (err) {
     console.warn('Error loading profile from Supabase:', err);
@@ -442,6 +439,35 @@ export async function uploadAvatarImage(
       error: err.message || 'Erro ao processar imagem.'
     };
   }
+}
+
+/** Update only fields the user changed, so unrelated cloud values stay intact. */
+export async function saveProfilePatchToSupabase(values: Partial<UserProfile>, userId: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client || !isValidUuid(userId) || await getActiveUserId() !== userId) return false;
+  const columns: Partial<Record<keyof UserProfile, string>> = {
+    name: 'name', avatarText: 'avatar_text', avatarUrl: 'avatar_url',
+    goalType: 'goal_type', heightCm: 'height_cm', startWeightKg: 'start_weight_kg',
+    currentWeightKg: 'current_weight_kg', goalWeightKg: 'goal_weight_kg',
+    dailyCaloriesTarget: 'daily_calories_target', targetMacros: 'target_macros',
+    gems: 'gems', burnedCalories: 'burned_calories',
+    appleHealthSynced: 'apple_health_synced', gender: 'gender', age: 'age',
+    activityLevel: 'activity_level', weeklyPaceKg: 'weekly_pace_kg',
+    petLevel: 'pet_level', petXp: 'pet_xp', petMood: 'pet_mood',
+    petName: 'pet_name', inventory: 'inventory', equippedCap: 'equipped_cap',
+    equippedGlasses: 'equipped_glasses', equippedClothes: 'equipped_clothes',
+    showSplashAnimation: 'show_splash_animation', isOnboardingCompleted: 'is_onboarding_completed'
+  };
+  const payload: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(values)) {
+    const column = columns[field as keyof UserProfile];
+    if (column) payload[column] = value === undefined ? null : value;
+  }
+  if (!Object.keys(payload).length) return true;
+  payload.updated_at = new Date().toISOString();
+  const { data, error } = await client.from('profiles').update(payload).eq('id', userId).select('id').maybeSingle();
+  if (error) console.warn('Erro ao sincronizar campos do perfil:', error);
+  return !error && data?.id === userId;
 }
 
 async function removeStoredAvatarFiles(

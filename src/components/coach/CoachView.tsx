@@ -3,7 +3,7 @@ import { Sparkles, Send, Bot, User, Droplets, Flame, Scale, Dumbbell, Check, Boo
 import { UserProfile, DayLog, FoodItem } from '../../types';
 import { WorkoutRoutine } from '../../types/workout';
 import { generateCoachAdvice, askCoachAI, CoachHistoryMessage } from '../../services/aiService';
-import { saveWorkoutRoutineToSupabase, saveCustomFoodToSupabase } from '../../services/supabaseClient';
+import { saveWorkoutRoutine } from '../../services/workoutService';
 import { useTheme } from '../../services/themeService';
 
 export interface RecipeProposal {
@@ -138,7 +138,8 @@ export const CoachView: React.FC<CoachViewProps> = ({
   const handleSaveProposalToRoutines = async (msgIndex: number, proposal: WorkoutRoutine) => {
     setSavingRoutineId(proposal.id);
     try {
-      await saveWorkoutRoutineToSupabase(proposal, profile.id);
+      const saved = await saveWorkoutRoutine(proposal, profile.id);
+      if (!saved) throw new Error('Não foi possível guardar a ficha na conta.');
       setMessages((prev) =>
         prev.map((m, idx) => (idx === msgIndex ? { ...m, isSavedToRoutines: true } : m))
       );
@@ -192,11 +193,8 @@ export const CoachView: React.FC<CoachViewProps> = ({
         }))
       };
 
-      await saveCustomFoodToSupabase(newFoodItem, profile.id);
-
-      if (onRecipeCreated) {
-        onRecipeCreated(newFoodItem);
-      }
+      if (!onRecipeCreated) throw new Error('Não foi possível guardar a receita na conta.');
+      onRecipeCreated(newFoodItem);
 
       setMessages((prev) =>
         prev.map((m, idx) => (idx === msgIndex ? { ...m, isSavedToRecipes: true } : m))

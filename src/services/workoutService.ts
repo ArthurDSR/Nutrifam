@@ -105,10 +105,11 @@ export function computeExerciseProgression(
 export async function getWorkoutRoutines(userId?: string): Promise<WorkoutRoutine[] | null> {
   if (!userId || !isVerifiedLocalUser(userId)) return null;
   const remote = navigator.onLine ? await loadWorkoutRoutinesFromSupabase(userId) : null;
+  if (remote !== null) writeWorkoutCache(userId, 'routines_server', remote);
   const routines = remote ?? readWorkoutCache<WorkoutRoutine>(userId, 'routines');
   for (const change of getPendingChanges(userId)) {
-    if (change.kind === 'routine') upsertById(routines, change.value);
-    if (change.kind === 'routineDelete') removeById(routines, change.id);
+    if (change.kind === 'routine' && (remote === null || (change.base !== undefined && JSON.stringify(routines.find((item) => item.id === change.value.id) ?? null) === JSON.stringify(change.base)))) upsertById(routines, change.value);
+    if (change.kind === 'routineDelete' && (remote === null || (change.base !== undefined && JSON.stringify(routines.find((item) => item.id === change.id) ?? null) === JSON.stringify(change.base)))) removeById(routines, change.id);
   }
   writeWorkoutCache(userId, 'routines', routines);
   return routines;
@@ -118,9 +119,10 @@ export async function saveWorkoutRoutine(routine: WorkoutRoutine, userId?: strin
   const owner = userId || routine.userId;
   if (!owner || !isVerifiedLocalUser(owner)) return false;
   const routines = readWorkoutCache<WorkoutRoutine>(owner, 'routines');
+  const base = readWorkoutCache<WorkoutRoutine>(owner, 'routines_server').find((item) => item.id === routine.id) ?? null;
   upsertById(routines, routine);
   writeWorkoutCache(owner, 'routines', routines);
-  queueChange(owner, { kind: 'routine', value: routine });
+  queueChange(owner, { kind: 'routine', value: routine, base });
   void flushPendingChanges(owner);
   return true;
 }
@@ -128,9 +130,10 @@ export async function saveWorkoutRoutine(routine: WorkoutRoutine, userId?: strin
 export async function deleteWorkoutRoutine(routineId: string, userId?: string): Promise<boolean> {
   if (!userId || !isVerifiedLocalUser(userId)) return false;
   const routines = readWorkoutCache<WorkoutRoutine>(userId, 'routines');
+  const base = readWorkoutCache<WorkoutRoutine>(userId, 'routines_server').find((item) => item.id === routineId) ?? null;
   removeById(routines, routineId);
   writeWorkoutCache(userId, 'routines', routines);
-  queueChange(userId, { kind: 'routineDelete', id: routineId });
+  queueChange(userId, { kind: 'routineDelete', id: routineId, base });
   void flushPendingChanges(userId);
   return true;
 }
@@ -138,9 +141,10 @@ export async function deleteWorkoutRoutine(routineId: string, userId?: string): 
 export async function deleteCompletedWorkout(workoutId: string, userId?: string): Promise<boolean> {
   if (!userId || !isVerifiedLocalUser(userId)) return false;
   const workouts = readWorkoutCache<CompletedWorkout>(userId, 'completed');
+  const base = readWorkoutCache<CompletedWorkout>(userId, 'completed_server').find((item) => item.id === workoutId) ?? null;
   removeById(workouts, workoutId);
   writeWorkoutCache(userId, 'completed', workouts);
-  queueChange(userId, { kind: 'completedDelete', id: workoutId });
+  queueChange(userId, { kind: 'completedDelete', id: workoutId, base });
   void flushPendingChanges(userId);
   return true;
 }
@@ -148,10 +152,11 @@ export async function deleteCompletedWorkout(workoutId: string, userId?: string)
 export async function getCompletedWorkouts(userId?: string): Promise<CompletedWorkout[] | null> {
   if (!userId || !isVerifiedLocalUser(userId)) return null;
   const remote = navigator.onLine ? await loadCompletedWorkoutsFromSupabase(userId) : null;
+  if (remote !== null) writeWorkoutCache(userId, 'completed_server', remote);
   const workouts = remote ?? readWorkoutCache<CompletedWorkout>(userId, 'completed');
   for (const change of getPendingChanges(userId)) {
-    if (change.kind === 'completed') upsertById(workouts, change.value);
-    if (change.kind === 'completedDelete') removeById(workouts, change.id);
+    if (change.kind === 'completed' && (remote === null || (change.base !== undefined && JSON.stringify(workouts.find((item) => item.id === change.value.id) ?? null) === JSON.stringify(change.base)))) upsertById(workouts, change.value);
+    if (change.kind === 'completedDelete' && (remote === null || (change.base !== undefined && JSON.stringify(workouts.find((item) => item.id === change.id) ?? null) === JSON.stringify(change.base)))) removeById(workouts, change.id);
   }
   writeWorkoutCache(userId, 'completed', workouts);
   return workouts;
@@ -251,7 +256,7 @@ export async function finishAndSaveWorkout(
   const workouts = readWorkoutCache<CompletedWorkout>(authenticatedUserId, 'completed');
   upsertById(workouts, completedWorkout);
   writeWorkoutCache(authenticatedUserId, 'completed', workouts);
-  queueChange(authenticatedUserId, { kind: 'completed', value: completedWorkout });
+  queueChange(authenticatedUserId, { kind: 'completed', value: completedWorkout, base: null });
   void flushPendingChanges(authenticatedUserId);
 
   return completedWorkout;

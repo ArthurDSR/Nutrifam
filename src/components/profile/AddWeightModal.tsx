@@ -22,7 +22,7 @@ export const AddWeightModal: React.FC<AddWeightModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseFloat(weight.replace(',', '.'));
-    if (isNaN(parsed) || parsed <= 0) return;
+    if (isNaN(parsed) || parsed <= 0 || !date || date > getTodayDateString()) return;
     onSaveWeight(parsed, date, note);
     onClose();
   };
@@ -60,6 +60,7 @@ export const AddWeightModal: React.FC<AddWeightModalProps> = ({
             <input
               type="date"
               required
+              max={getTodayDateString()}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="w-full p-2.5 rounded-xl border border-[#AEBDB5]/30 dark:border-[#394842] bg-[#F7F4EE] dark:bg-[#18201D] font-semibold text-[#3F4B46] dark:text-[#EDF2EF] focus:outline-none transition-colors"

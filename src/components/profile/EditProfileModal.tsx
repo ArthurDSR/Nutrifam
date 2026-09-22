@@ -3,7 +3,7 @@ import { X, Check, Calculator, Camera, Trash2, Loader2 } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { calculateNutrition } from '../../services/nutritionCalculator';
 import { useTheme } from '../../services/themeService';
-import { uploadAvatarImage, removeAvatarImage, saveProfileToSupabase, isSupabaseConfigured } from '../../services/supabaseClient';
+import { uploadAvatarImage, removeAvatarImage } from '../../services/supabaseClient';
 
 interface EditProfileModalProps {
   profile: UserProfile;
@@ -44,9 +44,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           avatarUrl: result.url
         };
         onSaveProfile(updated);
-        if (isSupabaseConfigured() && profile.id) {
-          saveProfileToSupabase(updated, profile.id);
-        }
       }
       if (result.error) {
         setUploadError(result.error);

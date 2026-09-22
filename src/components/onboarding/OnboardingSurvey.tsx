@@ -42,7 +42,6 @@ type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 type RaccoonPose = 'welcome' | 'thinking' | 'intellectual' | 'curious' | 'sporty' | 'cloud' | 'celebrate';
 
 const ONBOARDING_DRAFT_KEY = 'nutrifam_onboarding_draft';
-const LEGACY_ONBOARDING_DRAFT_KEY = 'nutrimonitor_onboarding_draft';
 
 function parseSurveyNumber(val: string): number {
   if (!val) return 0;
@@ -65,10 +64,10 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
 
   const initialUser: AuthUser | null = (() => {
     const local = getLocalAuthUser();
-    if (local) return local;
-    if (existingProfile?.email) {
+    if (local && existingProfile?.id === local.id) return local;
+    if (existingProfile?.id && existingProfile.email) {
       return {
-        id: existingProfile.id || 'local_user',
+        id: existingProfile.id,
         email: existingProfile.email,
         name: existingProfile.name || 'Usuário',
         provider: 'email'
@@ -77,10 +76,12 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
     return null;
   })();
 
-  // Load draft if user refreshed or redirected from OAuth
+  const draftKey = existingProfile?.id ? `${ONBOARDING_DRAFT_KEY}_${existingProfile.id}` : null;
+
+  // A draft belongs to one authenticated account, never to the browser globally.
   const draft = (() => {
     try {
-      const raw = sessionStorage.getItem(ONBOARDING_DRAFT_KEY) || sessionStorage.getItem(LEGACY_ONBOARDING_DRAFT_KEY);
+      const raw = draftKey ? sessionStorage.getItem(draftKey) : null;
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -131,9 +132,10 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
 
   // Save draft continuously so OAuth redirects or reload never drops survey state
   useEffect(() => {
+    if (!draftKey) return;
     try {
       sessionStorage.setItem(
-        ONBOARDING_DRAFT_KEY,
+        draftKey,
         JSON.stringify({
           currentStep,
           userName,
@@ -150,6 +152,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
       );
     } catch {}
   }, [
+    draftKey,
     currentStep,
     userName,
     petName,
@@ -524,7 +527,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
     };
 
     try {
-      sessionStorage.removeItem(ONBOARDING_DRAFT_KEY);
+      if (draftKey) sessionStorage.removeItem(draftKey);
     } catch {}
 
     onComplete(completedProfile, validCurrentWeight, registeredUser || undefined);

@@ -137,8 +137,8 @@ export function getStoredProfile(userId?: string): UserProfile {
 
     if (raw) {
       const parsed = JSON.parse(raw);
-      const isCompleted = Boolean(parsed.isOnboardingCompleted) ||
-        (Boolean(parsed.currentWeightKg && Number(parsed.currentWeightKg) > 0) && Boolean(parsed.name && parsed.name !== 'Meu Perfil'));
+      if (userId && parsed.id !== userId) return { ...DEFAULT_PROFILE };
+      const isCompleted = Boolean(parsed.isOnboardingCompleted);
 
       return {
         ...DEFAULT_PROFILE,

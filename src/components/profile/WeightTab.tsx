@@ -54,7 +54,7 @@ export const WeightTab: React.FC<WeightTabProps> = ({
     return true;
   });
 
-  const displayEntries = filteredEntries.length > 0 ? filteredEntries : sortedEntries;
+  const displayEntries = filteredEntries;
 
   // SVG Chart Dimensions & Dynamic Bounds
   const chartWidth = 350;
@@ -77,7 +77,6 @@ export const WeightTab: React.FC<WeightTabProps> = ({
   };
 
   const goalY = getYCoord(profile.goalWeightKg);
-  const currentY = getYCoord(profile.currentWeightKg);
 
   // Build SVG path
   const points = displayEntries.map((e, idx) => ({
@@ -288,17 +287,23 @@ export const WeightTab: React.FC<WeightTabProps> = ({
               />
             )}
 
-            {/* Current Weight Point marker */}
-            <circle
-              cx={chartWidth / 2}
-              cy={currentY}
-              r="5"
-              fill={activeColor.primary}
-              stroke={isDark ? '#232D29' : '#ffffff'}
-              strokeWidth="2.5"
-              className="drop-shadow-xs"
-            />
+            {points.map((point, index) => (
+              <circle
+                key={`${point.date}-${index}`}
+                cx={point.x}
+                cy={point.y}
+                r={index === points.length - 1 ? 5 : 3}
+                fill={activeColor.primary}
+                stroke={isDark ? '#232D29' : '#ffffff'}
+                strokeWidth="2"
+              />
+            ))}
           </svg>
+          {points.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-[#6F7C76] dark:text-[#A8B8B1]">
+              Nenhuma pesagem neste período
+            </div>
+          )}
         </div>
 
         {/* Quick Stats: BMI & Progress */}
@@ -316,6 +321,29 @@ export const WeightTab: React.FC<WeightTabProps> = ({
           </div>
         </div>
       </div>
+      <section className="mt-4 bg-white dark:bg-[#232D29] rounded-3xl p-4 shadow-cozy border border-[#AEBDB5]/30 dark:border-[#394842]">
+        <div className="flex items-baseline justify-between gap-2 mb-3">
+          <h3 className="text-sm font-extrabold text-[#3F4B46] dark:text-[#EDF2EF]">Histórico de pesagens</h3>
+          <span className="text-xs font-semibold text-[#6F7C76] dark:text-[#A8B8B1]">{sortedEntries.length} registros</span>
+        </div>
+        {sortedEntries.length === 0 ? (
+          <p className="text-xs text-[#6F7C76] dark:text-[#A8B8B1]">Suas pesagens aparecerão aqui após o primeiro registro.</p>
+        ) : (
+          <div className="divide-y divide-[#AEBDB5]/20 dark:divide-[#394842]">
+            {[...sortedEntries].reverse().map((entry) => (
+              <div key={entry.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#3F4B46] dark:text-[#EDF2EF]">
+                    {new Date(`${entry.date}T12:00:00`).toLocaleDateString(language === 'pt' ? 'pt-BR' : language === 'es' ? 'es-ES' : 'en-US', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </p>
+                  {entry.note && <p className="mt-1 text-xs text-[#6F7C76] dark:text-[#A8B8B1] break-words">{entry.note}</p>}
+                </div>
+                <span className="shrink-0 text-sm font-black text-[#3F4B46] dark:text-[#EDF2EF]">{entry.weightKg} kg</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };
