@@ -153,6 +153,7 @@ export const App: React.FC = () => {
   const [mfaCode, setMfaCode] = useState('');
   const [mfaError, setMfaError] = useState<string | null>(null);
   const [authLoadError, setAuthLoadError] = useState<string | null>(null);
+  const [unavailableData, setUnavailableData] = useState<string[]>([]);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [isSyncingHealth, setIsSyncingHealth] = useState(false);
   const [healthSyncToast, setHealthSyncToast] = useState<string | null>(null);
@@ -200,10 +201,12 @@ export const App: React.FC = () => {
         if (status.required) {
           setMfaGateUser(authUser);
           setMfaFactorId(status.factorId || null);
+          setMfaChecking(false);
           return;
         }
       } catch {
         setAuthLoadError('Não foi possível verificar a A2F. Tente novamente com conexão ativa.');
+        setMfaChecking(false);
         return;
       }
     }
@@ -259,18 +262,34 @@ export const App: React.FC = () => {
         loadWeightEntriesFromSupabase(authUser.id), loadCustomFoodsFromSupabase(authUser.id)
       ]);
       if (epoch !== authEpochRef.current) return;
-      if (!remoteProfile || remoteLogs === null || remoteWeights === null || remoteFoods === null) {
-        throw new Error('Não foi possível confirmar os dados desta conta no Supabase.');
-      }
+      if (!remoteProfile) throw new Error('O perfil da conta não pôde ser lido no Supabase.');
+      const unavailable = [
+        remoteLogs === null && 'diário',
+        remoteWeights === null && 'pesagens',
+        remoteFoods === null && 'alimentos personalizados'
+      ].filter((value): value is string => Boolean(value));
       const nextProfile: UserProfile = {
         ...DEFAULT_PROFILE, ...remoteProfile, id: authUser.id,
         email: authUser.email, isTwoFactorEnabled: mfaEnabled
       };
-      const nextLogs = remoteLogs;
-      const nextWeights = remoteWeights;
-      const nextFoods = remoteFoods;
+      // A falha de uma tabela secundária não invalida a autenticação. O cache
+      // pertence a este UUID; nunca o consideramos uma cópia confirmada do servidor.
+      const nextLogs = remoteLogs ?? cachedLogs;
+      const nextWeights = remoteWeights ?? cachedWeights;
+      const nextFoods = remoteFoods ?? cachedFoods;
       rememberBaseline(nextProfile, nextLogs, nextWeights, nextFoods);
+      const previousCloud = cloudBaselineRef.current;
       rememberCloudBaseline(authUser.id, nextProfile, nextLogs, nextWeights, nextFoods);
+      if (unavailable.length) {
+        cloudBaselineRef.current = {
+          ...cloudBaselineRef.current,
+          logs: remoteLogs === null ? previousCloud.logs : cloudBaselineRef.current.logs,
+          weights: remoteWeights === null ? previousCloud.weights : cloudBaselineRef.current.weights,
+          foods: remoteFoods === null ? previousCloud.foods : cloudBaselineRef.current.foods
+        };
+        writeCloudSnapshot(authUser.id, cloudBaselineRef.current);
+      }
+      setUnavailableData(unavailable);
       setProfile(nextProfile);
       setDayLogs(nextLogs);
       setWeightEntries([...nextWeights]);
@@ -283,7 +302,7 @@ export const App: React.FC = () => {
     } catch (error) {
       console.warn('Não foi possível confirmar os dados no Supabase:', error);
       if (epoch === authEpochRef.current) {
-        setAuthLoadError('Não foi possível carregar os dados da conta. Nada do aparelho foi enviado como substituto. Verifique a conexão e tente novamente.');
+        setAuthLoadError(error instanceof Error ? error.message : 'Não foi possível carregar o perfil da conta. Verifique a conexão e tente novamente.');
         setMfaChecking(false);
       }
     }
@@ -314,6 +333,7 @@ export const App: React.FC = () => {
     ++authEpochRef.current;
     setActiveUserId(null);
     setSyncConflictCount(0);
+    setUnavailableData([]);
     baselineRef.current = null;
     cloudBaselineRef.current = emptyAccountSnapshot();
     cloudProfileOwnerRef.current = null;
@@ -382,6 +402,7 @@ export const App: React.FC = () => {
             ++authEpochRef.current;
             setActiveUserId(null);
             setSyncConflictCount(0);
+            setUnavailableData([]);
             baselineRef.current = null;
             cloudBaselineRef.current = emptyAccountSnapshot();
             setProfile({ ...DEFAULT_PROFILE });
@@ -450,6 +471,11 @@ export const App: React.FC = () => {
         loadWeightEntriesFromSupabase(activeUserId), loadCustomFoodsFromSupabase(activeUserId)
       ]);
       if (cancelled) return;
+      setUnavailableData([
+        remoteLogs === null && 'diário',
+        remoteWeights === null && 'pesagens',
+        remoteFoods === null && 'alimentos personalizados'
+      ].filter((value): value is string => Boolean(value)));
       const snapshot: AccountSnapshot = {
         profile: remoteProfile ? JSON.stringify(remoteProfile) : cloudBaselineRef.current.profile,
         logs: remoteLogs === null ? cloudBaselineRef.current.logs : Object.fromEntries(Object.entries(remoteLogs).map(([date, log]) => [date, JSON.stringify(log)])),
@@ -1151,6 +1177,9 @@ export const App: React.FC = () => {
 
   return (
     <MobileFrame>
+      {unavailableData.length > 0 && <div role="alert" className="mx-3 mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100">
+        Não foi possível atualizar {unavailableData.join(', ')}. Os registros deste aparelho são exibidos provisoriamente; a sincronização será tentada novamente quando a conexão voltar.
+      </div>}
       {syncConflictCount > 0 && <div role="alert" className="mx-3 mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100">
         {syncConflictCount} alteração(ões) local(is) em conflito não foram enviadas. O valor do servidor foi mantido; os dados locais seguem preservados neste aparelho.
         <button type="button" onClick={exportSyncConflicts} className="mt-1 block font-bold underline">Exportar cópia das alterações</button>
