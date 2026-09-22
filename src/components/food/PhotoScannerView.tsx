@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Sparkles, Loader2, Plus, Check } from 'lucide-react';
+import { Camera, Upload, Sparkles, Loader2, Plus, Check, ScanLine } from 'lucide-react';
 import { analyzeFoodPhotoWithAI, ParsedFoodResult } from '../../services/aiService';
+import { analyzeImageDeterministically, DeterministicVisionResult } from '../../services/deterministicVisionService';
 import { FoodItem } from '../../types';
 import { useTheme } from '../../services/themeService';
 
@@ -31,6 +32,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ParsedFoodResult | null>(null);
+  const [visualAnalysis, setVisualAnalysis] = useState<DeterministicVisionResult | null>(null);
   const [isDone, setIsDone] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,21 +58,25 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
       setSelectedImage(base64);
-      runAnalysis(base64, file.type);
+      runAnalysis(base64);
     };
     reader.readAsDataURL(file);
   };
 
-  const runAnalysis = async (imageBase64: string, mimeType: string) => {
+  const runAnalysis = async (imageBase64: string) => {
     setIsAnalyzing(true);
     setResult(null);
+    setVisualAnalysis(null);
     try {
+      const deterministic = await analyzeImageDeterministically(imageBase64);
+      setVisualAnalysis(deterministic);
       const res = await analyzeFoodPhotoWithAI(
-        imageBase64,
-        mimeType,
+        deterministic.optimizedImage,
+        'image/jpeg',
         activeApiKey,
         aiProvider,
-        activeModel
+        activeModel,
+        deterministic
       );
       setResult(res);
     } catch (err) {
@@ -91,6 +97,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
     setTimeout(() => {
       setSelectedImage(null);
       setResult(null);
+      setVisualAnalysis(null);
       setIsDone(false);
     }, 1200);
   };
@@ -111,7 +118,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
                 : aiProvider === 'openai'
                 ? `Visão IA: OpenAI (${openaiModel || 'gpt-4o-mini'})`
                 : `Visão IA: Gemini (${geminiModel || 'gemini-3.5-flash-lite'})`
-              : 'Modo Local (Simulação de Prato Equilibrado)'}
+              : 'Visão local ativa · IA não configurada'}
           </span>
         </div>
         {onOpenSettings && (
@@ -149,7 +156,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
           <div>
             <h4 className="font-extrabold text-[#3F4B46] dark:text-[#EDF2EF] text-sm">Fotografar seu prato</h4>
             <p className="text-xs text-[#6F7C76] dark:text-[#A8B8B1] mt-1 max-w-xs">
-              A inteligência artificial analisa os alimentos, calcula as porções aproximadas e estima os macronutrientes.
+              A visão local mede as regiões do prato e a IA identifica os alimentos e estima os macronutrientes.
             </p>
           </div>
           <div className="flex gap-2">
@@ -175,6 +182,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
               onClick={() => {
                 setSelectedImage(null);
                 setResult(null);
+                setVisualAnalysis(null);
               }}
               className="absolute top-2 right-2 bg-black/60 text-white text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm"
             >
@@ -183,7 +191,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
             {isAnalyzing && (
               <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex flex-col items-center justify-center text-white">
                 <Loader2 className="w-8 h-8 animate-spin text-mint-400 mb-2" />
-                <span className="text-xs font-bold">Identificando alimentos com IA...</span>
+                <span className="text-xs font-bold">Segmentando o prato e consultando a IA...</span>
               </div>
             )}
           </div>
@@ -200,6 +208,22 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
                   {result.totalCalories} Cal
                 </span>
               </div>
+
+              {visualAnalysis && (
+                <div className="mt-3 p-2.5 rounded-xl bg-white/70 dark:bg-[#18201D] border border-[#AEBDB5]/20 dark:border-[#394842] text-[10px] text-[#6F7C76] dark:text-[#A8B8B1]">
+                  <div className="flex items-center gap-1.5 font-bold text-[#3F4B46] dark:text-[#EDF2EF]">
+                    <ScanLine className="w-3.5 h-3.5" style={{ color: activeColor.primary }} />
+                    <span>Visão local determinística</span>
+                  </div>
+                  <p className="mt-1">
+                    {visualAnalysis.regionCount} região(ões) · {Math.round(visualAnalysis.foregroundRatio * 100)}% da imagem · qualidade {visualAnalysis.quality}
+                  </p>
+                </div>
+              )}
+
+              <p className="mt-2 text-[10px] leading-relaxed text-[#6F7C76] dark:text-[#A8B8B1]">
+                {result.confidenceMessage}
+              </p>
 
               <div className="mt-3 space-y-1.5">
                 {result.items.map((it, idx) => (
@@ -223,9 +247,9 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
 
               <button
                 onClick={handleAddFoods}
-                disabled={isDone}
+                disabled={isDone || result.items.length === 0}
                 className="w-full mt-3 py-3 rounded-full font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all text-white active:scale-95"
-                style={{ backgroundColor: activeColor.primary }}
+                style={{ backgroundColor: result.items.length ? activeColor.primary : '#94a3b8' }}
               >
                 {isDone ? (
                   <>
@@ -235,7 +259,7 @@ export const PhotoScannerView: React.FC<PhotoScannerViewProps> = ({
                 ) : (
                   <>
                     <Plus className="w-4 h-4 stroke-[3]" />
-                    <span>Adicionar todos os itens ({result.totalCalories} Cal)</span>
+                    <span>{result.items.length ? `Adicionar todos os itens (${result.totalCalories} Cal)` : 'Nenhum alimento confirmado'}</span>
                   </>
                 )}
               </button>

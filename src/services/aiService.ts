@@ -1,4 +1,5 @@
 import { FoodItem, DayLog, UserProfile } from '../types';
+import type { DeterministicVisionResult } from './deterministicVisionService';
 
 export interface ParsedFoodResult {
   items: Omit<FoodItem, 'id'>[];
@@ -611,12 +612,17 @@ export async function analyzeFoodPhotoWithAI(
   mimeType = 'image/jpeg',
   apiKey?: string,
   provider: 'gemini' | 'openai' | 'openrouter' = 'gemini',
-  model?: string
+  model?: string,
+  visualAnalysis?: DeterministicVisionResult
 ): Promise<ParsedFoodResult> {
   const cleanKey = apiKey?.trim();
   if (cleanKey) {
     try {
+      const deterministicContext = visualAnalysis?.promptContext || '{"method":"unavailable"}';
       const prompt = `Analise esta foto de prato/refeição. Identifique os alimentos visíveis, estime as porções em gramas e calcule as calorias e macronutrientes aproximados.
+Uma análise visual local determinística já segmentou a imagem. Use as regiões e proporções abaixo como restrições geométricas; não trate famílias de cor como identificação definitiva do alimento:
+${deterministicContext}
+Regras: não invente itens invisíveis; tente manter o número de itens compatível com as regiões relevantes; use areaRatio apenas para proporção relativa, pois a foto não possui escala física; indique baixa confiança quando não houver referência de tamanho.
 Retorne ESTRITAMENTE um JSON no formato:
 {
   "items": [
@@ -806,63 +812,16 @@ Retorne ESTRITAMENTE um JSON no formato:
     }
   }
 
-  // Robust simulated vision preset for realistic food plate
-  const sampleItems: Omit<FoodItem, 'id'>[] = [
-    {
-      name: 'Filé de Frango Grelhado',
-      brand: 'Identificado na Foto',
-      calories: 220,
-      servingSize: '1 filé médio (140 g)',
-      servingGrams: 140,
-      protein: 42.0,
-      carbs: 0.0,
-      fat: 4.8,
-      fiber: 0.0,
-      colorDot: '#10b981',
-      category: 'Food'
-    },
-    {
-      name: 'Arroz Integral & Legumes',
-      brand: 'Identificado na Foto',
-      calories: 165,
-      servingSize: '1 concha rasa (120 g)',
-      servingGrams: 120,
-      protein: 3.8,
-      carbs: 34.5,
-      fat: 1.2,
-      fiber: 3.2,
-      colorDot: '#f97316',
-      category: 'Food'
-    },
-    {
-      name: 'Mix de Salada com Azeite',
-      brand: 'Identificado na Foto',
-      calories: 65,
-      servingSize: '1 prato pequeno (80 g)',
-      servingGrams: 80,
-      protein: 1.2,
-      carbs: 3.0,
-      fat: 5.5,
-      fiber: 2.1,
-      colorDot: '#22c55e',
-      category: 'Food'
-    }
-  ];
-
-  const totalCalories = sampleItems.reduce((acc, i) => acc + i.calories, 0);
-  const totalProtein = Number(sampleItems.reduce((acc, i) => acc + i.protein, 0).toFixed(1));
-  const totalCarbs = Number(sampleItems.reduce((acc, i) => acc + i.carbs, 0).toFixed(1));
-  const totalFat = Number(sampleItems.reduce((acc, i) => acc + i.fat, 0).toFixed(1));
-  const totalFiber = Number(sampleItems.reduce((acc, i) => acc + i.fiber, 0).toFixed(1));
-
   return {
-    items: sampleItems,
-    totalCalories,
-    totalProtein,
-    totalCarbs,
-    totalFat,
-    totalFiber,
-    confidenceMessage: 'Refeição balanceada identificada com alta confiança (Proteína magra + Carboidratos complexos + Fibras).'
+    items: [],
+    totalCalories: 0,
+    totalProtein: 0,
+    totalCarbs: 0,
+    totalFat: 0,
+    totalFiber: 0,
+    confidenceMessage: visualAnalysis
+      ? `Análise local concluída: ${visualAnalysis.regionCount} região(ões), qualidade ${visualAnalysis.quality}. Configure uma chave de IA para identificar os alimentos sem gerar dados fictícios.`
+      : 'Configure uma chave de IA para identificar alimentos por foto.'
   };
 }
 
