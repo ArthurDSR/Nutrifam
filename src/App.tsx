@@ -246,7 +246,7 @@ export const App: React.FC = () => {
       // deleted profile must be recreated from server defaults, never cache.
       const { data: profileRow, error: lookupError } = await client.from('profiles')
         .select('id').eq('id', authUser.id).maybeSingle();
-      if (lookupError) throw lookupError;
+      if (lookupError) throw new Error(`Consulta do perfil (${lookupError.code || 'sem código'}): ${lookupError.message}`);
       if (!profileRow) {
         const { error: createError } = await client.from('profiles').insert({
           id: authUser.id,
@@ -254,7 +254,11 @@ export const App: React.FC = () => {
           email: authUser.email,
           avatar_text: (authUser.name?.[0] || 'M').toUpperCase()
         });
-        if (createError && createError.code !== '23505') throw createError;
+        if (createError) {
+          // 23505 can refer to the email constraint, not necessarily an already
+          // created row for this user. Never treat it as a successful insert.
+          throw new Error(`Criação do perfil (${createError.code || 'sem código'}): ${createError.message}`);
+        }
       }
       await flushPendingChanges(authUser.id);
       const [remoteProfile, remoteLogs, remoteWeights, remoteFoods] = await Promise.all([
@@ -262,7 +266,13 @@ export const App: React.FC = () => {
         loadWeightEntriesFromSupabase(authUser.id), loadCustomFoodsFromSupabase(authUser.id)
       ]);
       if (epoch !== authEpochRef.current) return;
-      if (!remoteProfile) throw new Error('O perfil da conta não pôde ser lido no Supabase.');
+      if (!remoteProfile) {
+        const { data: visibleProfile, error: profileError } = await client.from('profiles')
+          .select('id').eq('id', authUser.id).maybeSingle();
+        if (profileError) throw new Error(`Falha ao ler o perfil (${profileError.code || 'sem código'}): ${profileError.message}`);
+        if (!visibleProfile) throw new Error('O login foi aceito, mas o perfil desta conta não está visível no Supabase. Verifique a política de acesso do perfil e a A2F.');
+        throw new Error('O perfil existe no Supabase, mas seus dados não puderam ser interpretados pelo app.');
+      }
       const unavailable = [
         remoteLogs === null && 'diário',
         remoteWeights === null && 'pesagens',
@@ -302,7 +312,9 @@ export const App: React.FC = () => {
     } catch (error) {
       console.warn('Não foi possível confirmar os dados no Supabase:', error);
       if (epoch === authEpochRef.current) {
-        setAuthLoadError(error instanceof Error ? error.message : 'Não foi possível carregar o perfil da conta. Verifique a conexão e tente novamente.');
+        setAuthLoadError(error instanceof Error ? error.message :
+          error && typeof error === 'object' && 'message' in error ? String(error.message) :
+          'Não foi possível carregar o perfil da conta. Verifique a conexão e tente novamente.');
         setMfaChecking(false);
       }
     }
