@@ -1,5 +1,4 @@
 import { getSupabase, isSupabaseConfigured } from './supabaseClient';
-import { UserProfile } from '../types';
 
 export interface AuthUser {
   id: string;
@@ -11,20 +10,7 @@ export interface AuthUser {
 }
 
 const AUTH_SESSION_KEY = 'nutrifam_auth_session';
-const LOCAL_USERS_KEY = 'nutrifam_local_accounts';
 const LEGACY_AUTH_SESSION_KEY = 'nutrimonitor_auth_session';
-const LEGACY_LOCAL_USERS_KEY = 'nutrimonitor_local_accounts';
-
-interface StoredLocalAccount {
-  id: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  createdAt: string;
-  provider?: 'email' | 'google' | 'apple';
-  isEmailVerified?: boolean;
-  profile?: UserProfile;
-}
 
 /**
  * Secure password hashing using Web Crypto API (SHA-256 with salt)
@@ -67,17 +53,6 @@ export function setLocalAuthUser(user: AuthUser | null): void {
   }
 }
 
-function getStoredLocalAccounts(): StoredLocalAccount[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_USERS_KEY) || localStorage.getItem(LEGACY_LOCAL_USERS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-function saveStoredLocalAccounts(accounts: StoredLocalAccount[]): void {
-  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(accounts));
-}
 
 /**
  * Register a new user with secure password hashing and duplicate email prevention
@@ -166,46 +141,7 @@ export async function registerAccount(
     }
   }
 
-  // 2. Local-First Cryptographic Auth Fallback (Offline Mode)
-  const localAccounts = getStoredLocalAccounts();
-
-  // Check for duplicate email
-  const existingAccount = localAccounts.find((a) => a.email === cleanEmail);
-  if (existingAccount) {
-    return {
-      success: false,
-      message: 'Este e-mail já está cadastrado neste dispositivo. Faça login com sua senha.'
-    };
-  }
-
-  // Hash password using Web Crypto SHA-256
-  const passwordHash = await hashPassword(password);
-  const newId = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
-
-  const newAccount: StoredLocalAccount = {
-    id: newId,
-    email: cleanEmail,
-    name: cleanName,
-    passwordHash,
-    createdAt: new Date().toISOString()
-  };
-
-  localAccounts.push(newAccount);
-  saveStoredLocalAccounts(localAccounts);
-
-  const authUser: AuthUser = {
-    id: newId,
-    email: cleanEmail,
-    name: cleanName,
-    createdAt: newAccount.createdAt
-  };
-  setLocalAuthUser(authUser);
-
-  return {
-    success: true,
-    message: 'Conta criada e criptografada com sucesso!',
-    user: authUser
-  };
+  return { success: false, message: 'A autenticação requer uma conta no servidor.' };
 }
 
 /**
@@ -281,38 +217,7 @@ export async function loginAccount(
     }
   }
 
-  // 2. Local-First Cryptographic Auth Verification
-  const localAccounts = getStoredLocalAccounts();
-  const account = localAccounts.find((a) => a.email === cleanEmail);
-
-  if (!account) {
-    return {
-      success: false,
-      message: 'Nenhuma conta cadastrada com este e-mail. Crie uma conta primeiro.'
-    };
-  }
-
-  const enteredHash = await hashPassword(password);
-  if (account.passwordHash !== enteredHash) {
-    return {
-      success: false,
-      message: 'Senha incorreta. Por favor, tente novamente.'
-    };
-  }
-
-  const authUser: AuthUser = {
-    id: account.id,
-    email: account.email,
-    name: account.name,
-    createdAt: account.createdAt
-  };
-  setLocalAuthUser(authUser);
-
-  return {
-    success: true,
-    message: 'Login realizado com sucesso!',
-    user: authUser
-  };
+  return { success: false, message: 'A autenticação requer uma conta no servidor.' };
 }
 
 /**
@@ -323,7 +228,7 @@ export async function logoutAccount(): Promise<void> {
     const client = getSupabase();
     if (client) {
       try {
-        await client.auth.signOut();
+        await client.auth.signOut({ scope: 'local' });
       } catch {}
     }
   }

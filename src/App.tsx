@@ -20,6 +20,7 @@ import { CoachView } from './components/coach/CoachView';
 import { calculateUnclaimedQuests } from './components/quests/QuestsView';
 import { FoodBudView } from './components/pet/FoodBudView';
 import { WorkoutsView } from './components/workout/WorkoutsView';
+import { CompletedWorkout } from './types/workout';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { ScientificAssessmentModal } from './components/modals/ScientificAssessmentModal';
 import { AuthModal } from './components/auth/AuthModal';
@@ -58,6 +59,8 @@ import {
   saveStoredDayLogs,
   getStoredCustomFoods,
   saveStoredCustomFoods,
+  DEFAULT_PROFILE,
+  migrateLegacyAccountCache,
   getTodayDateString,
   createEmptyDayLog
 } from './services/storage';
@@ -66,21 +69,21 @@ import {
   isSupabaseConfigured,
   getSupabase,
   loadProfileFromSupabase,
-  saveProfileToSupabase,
   loadDayLogsFromSupabase,
-  saveDayLogToSupabase,
   loadWeightEntriesFromSupabase,
-  saveWeightEntryToSupabase,
-  loadCustomFoodsFromSupabase,
-  saveCustomFoodToSupabase
+  loadCustomFoodsFromSupabase
 } from './services/supabaseClient';
+import { queueChange, flushPendingChanges, getPendingChanges, hasPendingChange } from './services/offlineSync';
 
 export const App: React.FC = () => {
   // Global State
-  const [profile, setProfile] = useState(() => { clearLegacyMfaData(); return getStoredProfile(); });
-  const [dayLogs, setDayLogs] = useState(getStoredDayLogs);
-  const [weightEntries, setWeightEntries] = useState(getStoredWeightEntries);
-  const [customFoods, setCustomFoods] = useState(getStoredCustomFoods);
+  const [profile, setProfile] = useState(() => { clearLegacyMfaData(); return { ...DEFAULT_PROFILE }; });
+  const [dayLogs, setDayLogs] = useState<Record<string, ReturnType<typeof createEmptyDayLog>>>({});
+  const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([]);
+  const [customFoods, setCustomFoods] = useState<FoodItem[]>([]);
+  const [activeUserId, setActiveUserId] = useState<string | null>(null);
+  const authEpochRef = useRef(0);
+  const baselineRef = useRef<{ profile: string; logs: Record<string, string>; weights: Record<string, string>; foods: Record<string, string> } | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(getTodayDateString);
   const [activeTab, setActiveTab] = useState<ActiveTab>('journal');
@@ -113,7 +116,7 @@ export const App: React.FC = () => {
   const [isScientificAssessmentOpen, setIsScientificAssessmentOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-  const [showSplash, setShowSplash] = useState(() => getStoredProfile().showSplashAnimation !== false);
+  const [showSplash, setShowSplash] = useState(false);
   const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
   const [mfaGateUser, setMfaGateUser] = useState<AuthUser | null>(null);
   const [mfaChecking, setMfaChecking] = useState(() => isSupabaseConfigured());
@@ -125,12 +128,25 @@ export const App: React.FC = () => {
   const [isOnboardingSurveyOpen, setIsOnboardingSurveyOpen] = useState(false);
   const [isNativeHealthNoticeOpen, setIsNativeHealthNoticeOpen] = useState(false);
 
-  const hasLoadedRemote = useRef(false);
   const cloudProfileOwnerRef = useRef<string | null>(null);
 
+  const rememberBaseline = (nextProfile: UserProfile, logs: typeof dayLogs, weights: WeightEntry[], foods: FoodItem[]) => {
+    baselineRef.current = {
+      profile: JSON.stringify(nextProfile),
+      logs: Object.fromEntries(Object.entries(logs).map(([date, log]) => [date, JSON.stringify(log)])),
+      weights: Object.fromEntries(weights.map((entry) => [entry.id, JSON.stringify(entry)])),
+      foods: Object.fromEntries(foods.map((food) => [food.id, JSON.stringify(food)]))
+    };
+  };
+
   const handleAuthSuccess = async (authUser: AuthUser) => {
+    const epoch = ++authEpochRef.current;
     let mfaEnabled = false;
-    if (isSupabaseConfigured()) {
+    if (!isSupabaseConfigured()) return;
+    if (navigator.onLine) {
+      const client = getSupabase();
+      const { data, error } = await client!.auth.getUser();
+      if (error || data.user?.id !== authUser.id) return;
       try {
         const status = await getMfaStatus();
         mfaEnabled = Boolean(status.factorId);
@@ -145,90 +161,67 @@ export const App: React.FC = () => {
         return;
       }
     }
+    else if (localStorage.getItem('nutrifam_verified_account_id') !== authUser.id) return;
+    if (epoch !== authEpochRef.current) return;
+    migrateLegacyAccountCache(authUser.id);
     setLocalAuthUser(authUser);
+    if (navigator.onLine) localStorage.setItem('nutrifam_verified_account_id', authUser.id);
     setIsAuthModalOpen(false);
-
-    // If Supabase is configured, check if this user already has an existing completed profile in Supabase
-    if (isSupabaseConfigured()) {
-      try {
-        const remoteProfile = await loadProfileFromSupabase(authUser.id);
-        if (remoteProfile) {
-          const hasAccountData =
-            Boolean(remoteProfile.isOnboardingCompleted) ||
-            Boolean(remoteProfile.currentWeightKg && remoteProfile.currentWeightKg > 0) ||
-            Boolean(remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ||
-            Boolean(remoteProfile.avatarUrl);
-
-          const mergedProfile: UserProfile = {
-            ...profile,
-            ...remoteProfile,
-            id: authUser.id,
-            email: authUser.email || remoteProfile.email,
-            name: (remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ? remoteProfile.name : (authUser.name || remoteProfile.name),
-            avatarText: (remoteProfile.name?.[0] || authUser.name?.[0] || 'A').toUpperCase(),
-            avatarUrl: remoteProfile.avatarUrl,
-            isTwoFactorEnabled: mfaEnabled,
-            isOnboardingCompleted: hasAccountData
-          };
-          cloudProfileOwnerRef.current = authUser.id;
-          setProfile(mergedProfile);
-          saveStoredProfile(mergedProfile);
-          if (hasAccountData) {
-            setIsOnboardingSurveyOpen(false);
-          }
-
-          const remoteLogs = await loadDayLogsFromSupabase(authUser.id);
-          if (remoteLogs && Object.keys(remoteLogs).length > 0) {
-            setDayLogs((prev) => ({ ...prev, ...remoteLogs }));
-          }
-
-          const remoteWeights = await loadWeightEntriesFromSupabase(authUser.id);
-          if (remoteWeights && remoteWeights.length > 0) {
-            setWeightEntries(remoteWeights);
-          }
-
-          const remoteFoods = await loadCustomFoodsFromSupabase(authUser.id);
-          if (remoteFoods && remoteFoods.length > 0) {
-            setCustomFoods((prev) => {
-              const existingIds = new Set(prev.map((f) => f.id));
-              const newOnes = remoteFoods.filter((f) => !existingIds.has(f.id));
-              return [...prev, ...newOnes];
-            });
-          }
-          return;
-        }
-      } catch (err) {
-        console.warn('Post-login sync notice:', err);
-      }
-    }
-
-    // If no completed remote profile exists, this is a fresh user or onboarding is in progress.
-    // Update auth credentials without wiping out survey inputs or pushing empty defaults.
+    const cached = getStoredProfile(authUser.id);
+    const cachedProfile: UserProfile = {
+      ...cached, id: authUser.id, email: authUser.email,
+      name: cached.name !== 'Meu Perfil' ? cached.name : (authUser.name || cached.name),
+      isTwoFactorEnabled: mfaEnabled
+    };
+    const cachedLogs = getStoredDayLogs(authUser.id);
+    const cachedWeights = getStoredWeightEntries(authUser.id);
+    const cachedFoods = getStoredCustomFoods(authUser.id);
+    rememberBaseline(cachedProfile, cachedLogs, cachedWeights, cachedFoods);
     cloudProfileOwnerRef.current = authUser.id;
-    setProfile((prev) => {
-      const baseProfile = prev.id && prev.id !== authUser.id
-        ? getStoredProfile(authUser.id)
-        : prev;
-      const updatedProfile: UserProfile = {
-        ...baseProfile,
-        id: authUser.id,
-        email: authUser.email,
-        name: authUser.name || baseProfile.name,
-        avatarText: (authUser.name?.[0] || baseProfile.name?.[0] || 'A').toUpperCase(),
-        isTwoFactorEnabled: mfaEnabled,
-      };
-      saveStoredProfile(updatedProfile);
-      if (isSupabaseConfigured() && updatedProfile.isOnboardingCompleted && updatedProfile.currentWeightKg > 0) {
-        saveProfileToSupabase(updatedProfile, authUser.id);
+    setProfile(cachedProfile);
+    setDayLogs(cachedLogs);
+    setWeightEntries(cachedWeights);
+    setCustomFoods(cachedFoods);
+    setActiveUserId(authUser.id);
+    setMfaChecking(false);
+    if (!navigator.onLine) return;
+    await flushPendingChanges(authUser.id);
+    try {
+      const [remoteProfile, remoteLogs, remoteWeights, remoteFoods] = await Promise.all([
+        loadProfileFromSupabase(authUser.id), loadDayLogsFromSupabase(authUser.id),
+        loadWeightEntriesFromSupabase(authUser.id), loadCustomFoodsFromSupabase(authUser.id)
+      ]);
+      if (epoch !== authEpochRef.current) return;
+      const pending = getPendingChanges(authUser.id);
+      const nextProfile = remoteProfile && !hasPendingChange(authUser.id, 'profile')
+        ? { ...cachedProfile, ...remoteProfile, avatarUrl: remoteProfile.avatarUrl, id: authUser.id, isTwoFactorEnabled: mfaEnabled }
+        : cachedProfile;
+      const nextLogs = { ...cachedLogs, ...(remoteLogs || {}) };
+      for (const change of pending) if (change.kind === 'dayLog') nextLogs[change.value.date] = change.value;
+      const nextWeights = remoteWeights || cachedWeights;
+      for (const change of pending) if (change.kind === 'weight') {
+        const index = nextWeights.findIndex((entry) => entry.id === change.value.id);
+        if (index >= 0) nextWeights[index] = change.value; else nextWeights.push(change.value);
       }
-      return updatedProfile;
-    });
+      const nextFoods = remoteFoods || cachedFoods;
+      for (const change of pending) if (change.kind === 'food') {
+        const index = nextFoods.findIndex((food) => food.id === change.value.id);
+        if (index >= 0) nextFoods[index] = change.value; else nextFoods.push(change.value);
+      }
+      rememberBaseline(nextProfile, nextLogs, nextWeights, nextFoods);
+      setProfile(nextProfile);
+      setDayLogs(nextLogs);
+      setWeightEntries([...nextWeights]);
+      setCustomFoods([...nextFoods]);
+      if (nextProfile.isOnboardingCompleted) setIsOnboardingSurveyOpen(false);
+    } catch (error) {
+      console.warn('Dados locais mantidos até a próxima sincronização:', error);
+    }
   };
 
   const checkMfaBeforeProfile = async (authUser: AuthUser) => {
     try {
       const status = await getMfaStatus();
-      setProfile((prev) => ({ ...prev, isTwoFactorEnabled: Boolean(status.factorId) }));
       if (status.required) {
         setMfaFactorId(status.factorId || null);
         setMfaGateUser(authUser);
@@ -248,14 +241,20 @@ export const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    ++authEpochRef.current;
+    setActiveUserId(null);
+    baselineRef.current = null;
+    cloudProfileOwnerRef.current = null;
+    setProfile({ ...DEFAULT_PROFILE });
+    setDayLogs({});
+    setWeightEntries([]);
+    setCustomFoods([]);
+    setActiveTab('journal');
+    setIsSettingsOpen(false);
+    setIsEditProfileOpen(false);
+    setMfaGateUser(null);
+    localStorage.removeItem('nutrifam_verified_account_id');
     await logoutAccount();
-    const cleanProfile: UserProfile = {
-      ...profile,
-      id: undefined,
-      email: undefined
-    };
-    setProfile(cleanProfile);
-    saveStoredProfile(cleanProfile);
   };
 
   // Check Supabase session, Google/Apple OAuth return callback & local auth session on mount
@@ -279,34 +278,9 @@ export const App: React.FC = () => {
     if (isSupabaseConfigured()) {
       const client = getSupabase();
       if (client) {
-        // Detect session from redirect hash or storage
-        client.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user) {
-            const u = session.user;
-            const authUser: AuthUser = {
-              id: u.id,
-              email: u.email || '',
-              name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'Usuário',
-              createdAt: u.created_at,
-              provider: (u.app_metadata?.provider as any) || 'email',
-              isEmailVerified: Boolean(u.email_confirmed_at)
-            };
-            void checkMfaBeforeProfile(authUser);
-
-            // Clean OAuth hash from browser address bar
-            if (window.location.hash && window.location.hash.includes('access_token')) {
-              window.history.replaceState({}, document.title, window.location.pathname);
-            }
-          } else {
-            setMfaChecking(false);
-          }
-        }).catch((err) => {
-          console.warn('Supabase getSession notice:', err);
-          setMfaChecking(false);
-        });
 
         const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
-          if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
+          if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
             const u = session.user;
             const authUser: AuthUser = {
               id: u.id,
@@ -316,15 +290,36 @@ export const App: React.FC = () => {
               provider: (u.app_metadata?.provider as any) || 'email',
               isEmailVerified: Boolean(u.email_confirmed_at)
             };
-            setTimeout(() => { void checkMfaBeforeProfile(authUser); }, 0);
+            setTimeout(() => {
+              if (!navigator.onLine && localStorage.getItem('nutrifam_verified_account_id') === authUser.id) {
+                void handleAuthSuccess(authUser);
+              } else {
+                void checkMfaBeforeProfile(authUser);
+              }
+            }, 0);
 
             if (window.location.hash && window.location.hash.includes('access_token')) {
               window.history.replaceState({}, document.title, window.location.pathname);
             }
           } else if (event === 'SIGNED_OUT') {
             setLocalAuthUser(null);
+            localStorage.removeItem('nutrifam_verified_account_id');
             setMfaGateUser(null);
             setMfaChecking(false);
+            ++authEpochRef.current;
+            setActiveUserId(null);
+            baselineRef.current = null;
+            setProfile({ ...DEFAULT_PROFILE });
+            setDayLogs({});
+            setWeightEntries([]);
+            setCustomFoods([]);
+          } else if (event === 'INITIAL_SESSION' && !session) {
+            const cachedUser = getLocalAuthUser();
+            if (!navigator.onLine && cachedUser && localStorage.getItem('nutrifam_verified_account_id') === cachedUser.id) {
+              void handleAuthSuccess(cachedUser);
+            } else {
+              setMfaChecking(false);
+            }
           }
         });
 
@@ -334,114 +329,37 @@ export const App: React.FC = () => {
       }
     }
 
-    // 2. Fallback local user check
-    const localUser = getLocalAuthUser();
-    if (localUser && (!profile.email || profile.id !== localUser.id)) {
-      setProfile((prev) => ({
-        ...prev,
-        id: localUser.id,
-        email: localUser.email,
-        name: localUser.name || prev.name
-      }));
-    }
+    setMfaChecking(false);
   }, []);
 
-  // Initial Supabase Sync
   useEffect(() => {
-    async function initSupabaseSync() {
-      if (!isSupabaseConfigured() || hasLoadedRemote.current) return;
-
-      const client = getSupabase();
-      if (!client) return;
-
-      // Always sync exercises (public catalog)
-      await syncExercisesFromSupabase();
-
-      try {
-        const { data: { session } } = await client.auth.getSession();
-        const currentUserId = session?.user?.id;
-        if (!currentUserId) {
-          // Keep hasLoadedRemote false until sign-in occurs
-          return;
-        }
-
-        const mfaStatus = await getMfaStatus();
-        if (mfaStatus.required) return;
-
-        hasLoadedRemote.current = true;
-
-        const remoteProfile = await loadProfileFromSupabase(currentUserId);
-        if (remoteProfile) {
-          const hasAccountData =
-            Boolean(remoteProfile.isOnboardingCompleted) ||
-            Boolean(remoteProfile.currentWeightKg && remoteProfile.currentWeightKg > 0) ||
-            Boolean(remoteProfile.name && remoteProfile.name !== 'Meu Perfil') ||
-            Boolean(remoteProfile.avatarUrl);
-
-          if (hasAccountData) {
-            const completedRemote: UserProfile = {
-              ...profile,
-              ...remoteProfile,
-              avatarUrl: remoteProfile.avatarUrl,
-              isOnboardingCompleted: true
-            };
-            cloudProfileOwnerRef.current = remoteProfile.id || null;
-            setProfile(completedRemote);
-            saveStoredProfile(completedRemote);
-            setIsOnboardingSurveyOpen(false);
-          }
-        }
-
-        const remoteLogs = await loadDayLogsFromSupabase(currentUserId);
-        if (remoteLogs && Object.keys(remoteLogs).length > 0) {
-          setDayLogs((prev) => ({ ...prev, ...remoteLogs }));
-        }
-
-        const remoteWeights = await loadWeightEntriesFromSupabase(currentUserId);
-        if (remoteWeights && remoteWeights.length > 0) {
-          setWeightEntries(remoteWeights);
-        }
-
-        const remoteFoods = await loadCustomFoodsFromSupabase(currentUserId);
-        if (remoteFoods && remoteFoods.length > 0) {
-          setCustomFoods((prev) => {
-            const existingIds = new Set(prev.map((f) => f.id));
-            const newOnes = remoteFoods.filter((f) => !existingIds.has(f.id));
-            return [...prev, ...newOnes];
-          });
-        }
-      } catch (err) {
-        console.warn('Initial Supabase sync notice:', err);
-      }
-    }
-
-    initSupabaseSync();
+    if (isSupabaseConfigured()) void syncExercisesFromSupabase();
   }, []);
 
   // Sync to localStorage and Supabase
   useEffect(() => {
+    if (!activeUserId || profile.id !== activeUserId || !baselineRef.current) return;
     saveStoredProfile(profile);
-    if (
-      isSupabaseConfigured() &&
-      profile.id &&
-      cloudProfileOwnerRef.current === profile.id &&
-      profile.isOnboardingCompleted &&
-      profile.currentWeightKg > 0
-    ) {
-      saveProfileToSupabase(profile);
+    const serialized = JSON.stringify(profile);
+    if (baselineRef.current.profile !== serialized) {
+      baselineRef.current.profile = serialized;
+      queueChange(activeUserId, { kind: 'profile', value: profile });
+      void flushPendingChanges(activeUserId);
     }
-  }, [profile]);
+  }, [profile, activeUserId]);
 
   // When returning to the app/tab, pull remote changes to stay synced across devices
   useEffect(() => {
-    if (!profile.id || !isSupabaseConfigured()) return;
+    if (!activeUserId || !isSupabaseConfigured()) return;
 
     let cancelled = false;
     const refreshProfileFromCloud = async () => {
       if (document.visibilityState === 'hidden') return;
-      const remoteProfile = await loadProfileFromSupabase(profile.id);
+      await flushPendingChanges(activeUserId);
+      if (hasPendingChange(activeUserId, 'profile')) return;
+      const remoteProfile = await loadProfileFromSupabase(activeUserId);
       if (!cancelled && remoteProfile) {
-        cloudProfileOwnerRef.current = profile.id!;
+        cloudProfileOwnerRef.current = activeUserId;
         setProfile((prev) => {
           const refreshedProfile = {
             ...prev,
@@ -449,6 +367,7 @@ export const App: React.FC = () => {
             // The cloud value is authoritative, including an intentional removal.
             avatarUrl: remoteProfile.avatarUrl
           };
+          if (baselineRef.current) baselineRef.current.profile = JSON.stringify(refreshedProfile);
           saveStoredProfile(refreshedProfile);
           return refreshedProfile;
         });
@@ -462,19 +381,59 @@ export const App: React.FC = () => {
       window.removeEventListener('focus', refreshProfileFromCloud);
       document.removeEventListener('visibilitychange', refreshProfileFromCloud);
     };
-  }, [profile.id]);
+  }, [activeUserId]);
 
   useEffect(() => {
-    saveStoredDayLogs(dayLogs);
-  }, [dayLogs]);
+    if (!activeUserId || !baselineRef.current) return;
+    saveStoredDayLogs(dayLogs, activeUserId);
+    for (const [date, log] of Object.entries(dayLogs)) {
+      const serialized = JSON.stringify(log);
+      if (baselineRef.current.logs[date] !== serialized) {
+        baselineRef.current.logs[date] = serialized;
+        queueChange(activeUserId, { kind: 'dayLog', value: log });
+      }
+    }
+    void flushPendingChanges(activeUserId);
+  }, [dayLogs, activeUserId]);
 
   useEffect(() => {
-    saveStoredWeightEntries(weightEntries);
-  }, [weightEntries]);
+    if (!activeUserId || !baselineRef.current) return;
+    saveStoredWeightEntries(weightEntries, activeUserId);
+    for (const entry of weightEntries) {
+      const serialized = JSON.stringify(entry);
+      if (baselineRef.current.weights[entry.id] !== serialized) {
+        baselineRef.current.weights[entry.id] = serialized;
+        queueChange(activeUserId, { kind: 'weight', value: entry });
+      }
+    }
+    void flushPendingChanges(activeUserId);
+  }, [weightEntries, activeUserId]);
 
   useEffect(() => {
-    saveStoredCustomFoods(customFoods);
-  }, [customFoods]);
+    if (!activeUserId || !baselineRef.current) return;
+    saveStoredCustomFoods(customFoods, activeUserId);
+    for (const food of customFoods) {
+      const serialized = JSON.stringify(food);
+      if (baselineRef.current.foods[food.id] !== serialized) {
+        baselineRef.current.foods[food.id] = serialized;
+        queueChange(activeUserId, { kind: 'food', value: food });
+      }
+    }
+    void flushPendingChanges(activeUserId);
+  }, [customFoods, activeUserId]);
+
+  useEffect(() => {
+    if (!activeUserId) return;
+    const retry = () => { void flushPendingChanges(activeUserId); };
+    window.addEventListener('online', retry);
+    window.addEventListener('focus', retry);
+    const interval = window.setInterval(retry, 30000);
+    return () => {
+      window.removeEventListener('online', retry);
+      window.removeEventListener('focus', retry);
+      window.clearInterval(interval);
+    };
+  }, [activeUserId]);
 
   // User dynamic water target based on current weight (35ml/kg + 500ml activity reserve)
   const userWaterTarget = Number(((profile.currentWeightKg * 35 + 500) / 1000).toFixed(1)) || 2.0;
@@ -493,9 +452,6 @@ export const App: React.FC = () => {
       [selectedDate]: updatedLog
     }));
 
-    if (isSupabaseConfigured()) {
-      saveDayLogToSupabase(updatedLog, profile.id);
-    }
   };
 
   // Reset / Zero out the current day's log (meals, water, and activities)
@@ -511,9 +467,6 @@ export const App: React.FC = () => {
       [selectedDate]: freshLog
     }, profile.id);
 
-    if (isSupabaseConfigured()) {
-      saveDayLogToSupabase(freshLog, profile.id);
-    }
 
     if (selectedDate === getTodayDateString()) {
       setProfile((prev) => ({
@@ -735,6 +688,46 @@ export const App: React.FC = () => {
   };
 
   // Activities handler
+  const workoutActivityId = (workoutId: string) => `workout:${workoutId}`;
+
+  const handleWorkoutFinished = (workout: CompletedWorkout) => {
+    const date = workout.date;
+    const id = workoutActivityId(workout.id);
+    const existingLog = dayLogs[date] || createEmptyDayLog(date, profile.dailyCaloriesTarget, userWaterTarget);
+    if (existingLog.activities.some((activity) => activity.id === id)) return;
+    const activity: ActivityEntry = {
+      id,
+      title: `🏋️ ${workout.title}`,
+      durationMinutes: workout.durationMinutes,
+      caloriesBurned: workout.caloriesBurned,
+      timestamp: workout.endTime
+    };
+    const activities = [...existingLog.activities, activity];
+    setDayLogs((prev) => {
+      const log = prev[date] || createEmptyDayLog(date, profile.dailyCaloriesTarget, userWaterTarget);
+      if (log.activities.some((item) => item.id === id)) return prev;
+      return { ...prev, [date]: { ...log, activities: [...log.activities, activity] } };
+    });
+    if (date === getTodayDateString()) {
+      setProfile((prev) => ({ ...prev, burnedCalories: activities.reduce((sum, item) => sum + item.caloriesBurned, 0) }));
+    }
+  };
+
+  const handleWorkoutDeleted = (workout: CompletedWorkout) => {
+    const log = dayLogs[workout.date];
+    if (!log) return;
+    const activities = log.activities.filter((activity) => activity.id !== workoutActivityId(workout.id));
+    if (activities.length === log.activities.length) return;
+    setDayLogs((prev) => {
+      const current = prev[workout.date];
+      if (!current) return prev;
+      return { ...prev, [workout.date]: { ...current, activities: current.activities.filter((activity) => activity.id !== workoutActivityId(workout.id)) } };
+    });
+    if (workout.date === getTodayDateString()) {
+      setProfile((prev) => ({ ...prev, burnedCalories: activities.reduce((sum, item) => sum + item.caloriesBurned, 0) }));
+    }
+  };
+
   const handleAddActivity = (entry: Omit<ActivityEntry, 'id' | 'timestamp'>) => {
     const newActivity: ActivityEntry = {
       ...entry,
@@ -811,17 +804,11 @@ export const App: React.FC = () => {
       gems: prev.gems + 30
     }));
 
-    if (isSupabaseConfigured()) {
-      saveWeightEntryToSupabase(newEntry);
-    }
   };
 
   // Custom Food handler
   const handleCreateCustomFood = (food: FoodItem) => {
     setCustomFoods((prev) => [food, ...prev]);
-    if (isSupabaseConfigured()) {
-      saveCustomFoodToSupabase(food);
-    }
   };
 
   const handleSyncHealth = async (silent = false) => {
@@ -950,7 +937,7 @@ export const App: React.FC = () => {
     };
     const newWeightEntries = [initialEntry];
     setWeightEntries(newWeightEntries);
-    saveStoredWeightEntries(newWeightEntries);
+    saveStoredWeightEntries(newWeightEntries, finalProfile.id);
 
     // 3. Update or create today's DayLog with newly calculated targets
     setDayLogs((prev) => {
@@ -958,15 +945,9 @@ export const App: React.FC = () => {
       const syncedToday = syncDayLogMealTargets(existingToday, finalProfile.dailyCaloriesTarget);
       syncedToday.water.targetLiters = Number(((initialWeight * 35 + 500) / 1000).toFixed(1));
       const updatedLogs = { ...prev, [today]: syncedToday };
-      saveStoredDayLogs(updatedLogs);
+      saveStoredDayLogs(updatedLogs, finalProfile.id);
       return updatedLogs;
     });
-
-    // 4. Sync with Supabase if configured
-    if (isSupabaseConfigured()) {
-      saveProfileToSupabase(finalProfile, finalProfile.id);
-      saveWeightEntryToSupabase(initialEntry, finalProfile.id);
-    }
 
     setActiveTab('journal');
   };
@@ -1012,6 +993,17 @@ export const App: React.FC = () => {
       <button type="submit" disabled={mfaCode.length !== 6} className="w-full rounded-xl bg-emerald-700 py-3 text-xs font-bold text-white disabled:opacity-50">Verificar código</button>
       <button type="button" onClick={async () => { await handleLogout(); setMfaGateUser(null); setMfaFactorId(null); setMfaError(null); setMfaCode(''); }} className="w-full text-xs text-[#6F7C76] dark:text-[#A8B8B1]">Sair da conta</button>
     </form>
+  </div>;
+
+  if (!activeUserId) return <div className="min-h-dvh flex items-center justify-center bg-[#F7F4EE] dark:bg-[#18201D] p-4">
+    <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#232D29] p-6 text-center text-[#18201D] dark:text-white shadow-lg">
+      <h1 className="text-2xl font-bold">NutriFam</h1>
+      <p className="mt-3 text-sm text-[#6F7C76] dark:text-[#A8B8B1]">Entre na sua conta para acessar seus dados. Depois do primeiro acesso, você poderá continuar usando o app sem internet.</p>
+      {!isSupabaseConfigured() && <p role="alert" className="mt-4 text-sm text-rose-600">A autenticação não está configurada neste dispositivo.</p>}
+      <button type="button" disabled={!isSupabaseConfigured()} onClick={() => { setAuthModalMode('login'); setIsAuthModalOpen(true); }} className="mt-6 w-full rounded-xl bg-emerald-700 py-3 font-bold text-white disabled:opacity-50">Entrar</button>
+      <button type="button" disabled={!isSupabaseConfigured()} onClick={() => { setAuthModalMode('register'); setIsAuthModalOpen(true); }} className="mt-3 w-full rounded-xl border border-emerald-700 py-3 font-bold text-emerald-700 disabled:opacity-50">Criar conta</button>
+    </div>
+    <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuthSuccess={handleAuthSuccess} initialMode={authModalMode} />
   </div>;
 
   return (
@@ -1103,6 +1095,7 @@ export const App: React.FC = () => {
             {/* Activities Card (2f.jpg) */}
             <ActivitiesCard
               activities={currentDayLog.activities}
+              weightKg={profile.currentWeightKg}
               onAddActivity={handleAddActivity}
               onRemoveActivity={handleRemoveActivity}
               onSyncHealth={handleSyncHealth}
@@ -1175,7 +1168,8 @@ export const App: React.FC = () => {
         {activeTab === 'workouts' && (
           <WorkoutsView
             profile={profile}
-            onUpdateProfile={(updates) => setProfile((p) => ({ ...p, ...updates }))}
+            onWorkoutFinished={handleWorkoutFinished}
+            onWorkoutDeleted={handleWorkoutDeleted}
           />
         )}
 
@@ -1294,9 +1288,6 @@ export const App: React.FC = () => {
           onClose={() => setIsEditProfileOpen(false)}
           onSaveProfile={(updated) => {
             setProfile(updated);
-            if (isSupabaseConfigured()) {
-              saveProfileToSupabase(updated);
-            }
             if (updated.dailyCaloriesTarget) {
               updateCurrentDayLog(syncDayLogMealTargets(currentDayLog, updated.dailyCaloriesTarget));
             }

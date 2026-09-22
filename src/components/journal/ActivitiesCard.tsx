@@ -3,9 +3,11 @@ import { X, Flame, Loader2 } from 'lucide-react';
 import { ActivityEntry } from '../../types';
 import { useTranslation } from '../../services/i18n';
 import { useTheme } from '../../services/themeService';
+import { estimateActiveCalories, JOURNAL_ACTIVITY_TYPES } from '../../services/activityCalories';
 
 interface ActivitiesCardProps {
   activities: ActivityEntry[];
+  weightKg: number;
   onAddActivity: (entry: Omit<ActivityEntry, 'id' | 'timestamp'>) => void;
   onRemoveActivity: (id: string) => void;
   onSyncHealth?: () => void;
@@ -14,6 +16,7 @@ interface ActivitiesCardProps {
 
 export const ActivitiesCard: React.FC<ActivitiesCardProps> = ({
   activities,
+  weightKg,
   onAddActivity,
   onRemoveActivity,
   onSyncHealth,
@@ -27,17 +30,12 @@ export const ActivitiesCard: React.FC<ActivitiesCardProps> = ({
 
   const totalCaloriesBurned = activities.reduce((acc, a) => acc + a.caloriesBurned, 0);
 
-  const activityTypes = [
-    { title: 'Caminhada', ratePerMin: 4.5, icon: '🚶' },
-    { title: 'Corrida', ratePerMin: 11.0, icon: '🏃' },
-    { title: 'Musculação', ratePerMin: 6.0, icon: '🏋️' },
-    { title: 'Ciclismo', ratePerMin: 8.5, icon: '🚴' },
-    { title: 'Natação', ratePerMin: 9.0, icon: '🏊' }
-  ];
+  const activityTypes = JOURNAL_ACTIVITY_TYPES;
+  const estimate = (met: number) => estimateActiveCalories(met, durationMin, weightKg > 30 ? weightKg : 70);
 
   const handleSave = () => {
     const act = activityTypes.find((a) => a.title === selectedType) || activityTypes[0];
-    const burned = Math.round(act.ratePerMin * durationMin);
+    const burned = estimate(act.met);
     onAddActivity({
       title: `${act.icon} ${selectedType}`,
       caloriesBurned: burned,
@@ -174,15 +172,14 @@ export const ActivitiesCard: React.FC<ActivitiesCardProps> = ({
               </div>
 
               <div className="bg-[#F7F4EE] dark:bg-[#18201D] rounded-2xl p-3 border border-[#AEBDB5]/20 dark:border-[#394842] flex items-center justify-between text-xs">
-                <span className="text-[#6F7C76] dark:text-[#A8B8B1] font-medium">Estimativa de queima:</span>
+                <span className="text-[#6F7C76] dark:text-[#A8B8B1] font-medium">Calorias ativas estimadas:</span>
                 <span className="font-black text-orange-500 dark:text-orange-400 text-sm flex items-center gap-1">
                   <Flame className="w-4 h-4 fill-orange-400" />
-                  {Math.round(
-                    (activityTypes.find((a) => a.title === selectedType)?.ratePerMin || 5) * durationMin
-                  )}{' '}
+                  {estimate(activityTypes.find((a) => a.title === selectedType)?.met || activityTypes[0].met)}{' '}
                   Cal
                 </span>
               </div>
+              <p className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1]">Estimativa aproximada para {weightKg > 30 ? weightKg : 70} kg. {weightKg > 30 ? '' : 'Informe seu peso no perfil para personalizar.'} Registre apenas o tempo da atividade, sem pausas longas.</p>
 
               <button
                 onClick={handleSave}

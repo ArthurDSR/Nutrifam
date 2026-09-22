@@ -42,12 +42,13 @@ import { useTheme } from '../../services/themeService';
 
 interface WorkoutsViewProps {
   profile: UserProfile;
-  onUpdateProfile: (updates: Partial<UserProfile>) => void;
+  onWorkoutFinished: (workout: CompletedWorkout) => void;
+  onWorkoutDeleted: (workout: CompletedWorkout) => void;
 }
 
 type WorkoutSubTab = 'routines' | 'history' | 'exercises';
 
-export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdateProfile }) => {
+export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onWorkoutFinished, onWorkoutDeleted }) => {
   const { activeColor } = useTheme();
 
   const [activeSubTab, setActiveSubTab] = useState<WorkoutSubTab>('routines');
@@ -139,13 +140,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
     setHistoryError(null);
     setExpandedWorkoutId(completed.id);
 
-    // Add burned calories to profile
-    if (completed.caloriesBurned > 0) {
-      const currentBurned = profile.burnedCalories || 0;
-      onUpdateProfile({
-        burnedCalories: currentBurned + completed.caloriesBurned
-      });
-    }
+    onWorkoutFinished(completed);
 
     setActiveSubTab('history');
   };
@@ -178,6 +173,8 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
     const deleted = await deleteCompletedWorkout(workoutId, profile.id);
     if (deleted) {
       setHistory((prev) => prev.filter((workout) => workout.id !== workoutId));
+      const removedWorkout = history.find((workout) => workout.id === workoutId);
+      if (removedWorkout) onWorkoutDeleted(removedWorkout);
     } else {
       alert('Não foi possível excluir o treino. Verifique sua conexão e tente novamente.');
     }
@@ -468,7 +465,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ profile, onUpdatePro
                       {item.caloriesBurned} kcal
                     </span>
                     <span className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] font-semibold">
-                      Gasto Científico (MET)
+                      Estimativa de calorias ativas
                     </span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-[#6F7C76]" />

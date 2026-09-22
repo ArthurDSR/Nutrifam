@@ -13,6 +13,31 @@ const LEGACY_DAY_LOGS_KEY = 'nutrimonitor_day_logs';
 const LEGACY_WEIGHT_ENTRIES_KEY = 'nutrimonitor_weight_entries';
 const LEGACY_CUSTOM_FOODS_KEY = 'nutrimonitor_custom_foods';
 
+/** One-time migration of the old shared cache, only when its owner is known. */
+export function migrateLegacyAccountCache(userId: string): void {
+  try {
+    const rawProfile = localStorage.getItem(USER_PROFILE_KEY) || localStorage.getItem(LEGACY_USER_PROFILE_KEY);
+    if (!rawProfile || JSON.parse(rawProfile).id !== userId) return;
+    const groups = [
+      [USER_PROFILE_KEY, LEGACY_USER_PROFILE_KEY],
+      [DAY_LOGS_KEY, LEGACY_DAY_LOGS_KEY],
+      [WEIGHT_ENTRIES_KEY, LEGACY_WEIGHT_ENTRIES_KEY],
+      [CUSTOM_FOODS_KEY, LEGACY_CUSTOM_FOODS_KEY]
+    ];
+    for (const [current, legacy] of groups) {
+      const scoped = `${current}_${userId}`;
+      const value = localStorage.getItem(current) || localStorage.getItem(legacy);
+      if (value && !localStorage.getItem(scoped)) localStorage.setItem(scoped, value);
+    }
+    for (const [current, legacy] of groups) {
+      localStorage.removeItem(current);
+      localStorage.removeItem(legacy);
+    }
+  } catch (error) {
+    console.warn('Não foi possível migrar o cache local da conta:', error);
+  }
+}
+
 export const DEFAULT_PROFILE: UserProfile = {
   name: 'Meu Perfil',
   avatarText: 'M',
@@ -149,7 +174,6 @@ export function getStoredProfile(userId?: string): UserProfile {
 
 export function saveStoredProfile(profile: UserProfile): void {
   try {
-    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
     if (profile.id) {
       localStorage.setItem(`${USER_PROFILE_KEY}_${profile.id}`, JSON.stringify(profile));
     }
@@ -158,9 +182,10 @@ export function saveStoredProfile(profile: UserProfile): void {
   }
 }
 
-export function getStoredWeightEntries(): WeightEntry[] {
+export function getStoredWeightEntries(userId?: string): WeightEntry[] {
   try {
-    const raw = localStorage.getItem(WEIGHT_ENTRIES_KEY) || localStorage.getItem(LEGACY_WEIGHT_ENTRIES_KEY);
+    if (!userId) return DEFAULT_WEIGHT_ENTRIES;
+    const raw = localStorage.getItem(`${WEIGHT_ENTRIES_KEY}_${userId}`);
     if (raw) return JSON.parse(raw);
   } catch (e) {
     console.error('Error loading weights:', e);
@@ -168,9 +193,9 @@ export function getStoredWeightEntries(): WeightEntry[] {
   return DEFAULT_WEIGHT_ENTRIES;
 }
 
-export function saveStoredWeightEntries(entries: WeightEntry[]): void {
+export function saveStoredWeightEntries(entries: WeightEntry[], userId?: string): void {
   try {
-    localStorage.setItem(WEIGHT_ENTRIES_KEY, JSON.stringify(entries));
+    if (userId) localStorage.setItem(`${WEIGHT_ENTRIES_KEY}_${userId}`, JSON.stringify(entries));
   } catch (e) {
     console.error('Error saving weights:', e);
   }
@@ -179,8 +204,9 @@ export function saveStoredWeightEntries(entries: WeightEntry[]): void {
 export function getStoredDayLogs(userId?: string): Record<string, DayLog> {
   const todayStr = getTodayDateString();
   try {
-    const key = userId ? `${DAY_LOGS_KEY}_${userId}` : DAY_LOGS_KEY;
-    const legacyKey = userId ? `${LEGACY_DAY_LOGS_KEY}_${userId}` : LEGACY_DAY_LOGS_KEY;
+    if (!userId) return { [todayStr]: createEmptyDayLog(todayStr) };
+    const key = `${DAY_LOGS_KEY}_${userId}`;
+    const legacyKey = `${LEGACY_DAY_LOGS_KEY}_${userId}`;
     const raw = localStorage.getItem(key)
       || localStorage.getItem(legacyKey);
     if (raw) {
@@ -212,19 +238,16 @@ export function getStoredDayLogs(userId?: string): Record<string, DayLog> {
 
 export function saveStoredDayLogs(logs: Record<string, DayLog>, userId?: string): void {
   try {
-    const key = userId ? `${DAY_LOGS_KEY}_${userId}` : DAY_LOGS_KEY;
-    localStorage.setItem(key, JSON.stringify(logs));
-    if (userId) {
-      localStorage.setItem(DAY_LOGS_KEY, JSON.stringify(logs));
-    }
+    if (userId) localStorage.setItem(`${DAY_LOGS_KEY}_${userId}`, JSON.stringify(logs));
   } catch (e) {
     console.error('Error saving day logs:', e);
   }
 }
 
-export function getStoredCustomFoods(): FoodItem[] {
+export function getStoredCustomFoods(userId?: string): FoodItem[] {
   try {
-    const raw = localStorage.getItem(CUSTOM_FOODS_KEY) || localStorage.getItem(LEGACY_CUSTOM_FOODS_KEY);
+    if (!userId) return [];
+    const raw = localStorage.getItem(`${CUSTOM_FOODS_KEY}_${userId}`);
     if (raw) {
       const stored = JSON.parse(raw) as FoodItem[];
       const legacyIds = new Set(INITIAL_FOOD_DATABASE.map((food) => food.id));
@@ -236,9 +259,9 @@ export function getStoredCustomFoods(): FoodItem[] {
   return [];
 }
 
-export function saveStoredCustomFoods(foods: FoodItem[]): void {
+export function saveStoredCustomFoods(foods: FoodItem[], userId?: string): void {
   try {
-    localStorage.setItem(CUSTOM_FOODS_KEY, JSON.stringify(foods));
+    if (userId) localStorage.setItem(`${CUSTOM_FOODS_KEY}_${userId}`, JSON.stringify(foods));
   } catch (e) {
     console.error('Error saving custom foods:', e);
   }
