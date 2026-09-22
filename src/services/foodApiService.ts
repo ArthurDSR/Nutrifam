@@ -74,6 +74,10 @@ export function matchesQueryTokens(targetText: string, queryTokens: string[]): b
  * Classifies a food item into one of the main meal categories
  */
 export function classifyFoodCategory(item: FoodItem): FoodCategoryKey {
+  if (item.foodGroup === 'protein' || item.foodGroup === 'legume' || item.foodGroup === 'nuts_seeds') return 'protein';
+  if (item.foodGroup === 'fruit' || item.foodGroup === 'vegetable') return 'fruit_veg';
+  if (item.foodGroup === 'dairy') return 'dairy_drink';
+  if (item.foodGroup === 'grain') return 'carb';
   const norm = normalizeSearchString(item.name + ' ' + (item.brand || ''));
 
   // 1. Proteínas

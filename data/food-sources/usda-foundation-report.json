@@ -1,12 +1,28 @@
 {
-  "generatedAt": "2026-09-18T22:28:09.322Z",
+  "generatedAt": "2026-09-22T18:40:25.850Z",
   "source": "usda",
   "input": "data/food-sources/usda-foundation-2026-04/FoodData_Central_foundation_food_json_2026-04-30.json",
   "received": 363,
-  "accepted": 334,
-  "rejected": 29,
-  "catalogTotal": 334,
+  "accepted": 302,
+  "rejected": 61,
+  "catalogTotal": 302,
   "policyVersion": "2026.09.1",
+  "quality": {
+    "zeroCalories": 0,
+    "analyticalEnergy": 86,
+    "calculatedEnergy": 216,
+    "groupCoverage": {
+      "dairy": 39,
+      "fat_oil": 1,
+      "fruit": 44,
+      "grain": 40,
+      "legume": 19,
+      "nuts_seeds": 19,
+      "other": 26,
+      "protein": 35,
+      "vegetable": 79
+    }
+  },
   "rejectionDetails": [
     {
       "row": 2,
@@ -17,7 +33,7 @@
     },
     {
       "row": 41,
-      "name": "Restaurant, Chinese, frito arroz, without meat",
+      "name": "Restaurant, Chinese, frito arroz, without carne",
       "errors": [
         "preparação composta sem receita completa ou produto embalado com marca e código de barras"
       ]
@@ -52,7 +68,7 @@
     },
     {
       "row": 72,
-      "name": "Ham, sliced, restaurant",
+      "name": "Ham, fatiado, restaurant",
       "errors": [
         "preparação composta sem receita completa ou produto embalado com marca e código de barras"
       ]
@@ -62,6 +78,125 @@
       "name": "queijo, American, restaurant",
       "errors": [
         "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
+      "row": 74,
+      "name": "feijão, seco, Medium vermelho (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 75,
+      "name": "feijão, seco, vermelho (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 76,
+      "name": "feijão, seco, Flor de Mayo (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 77,
+      "name": "feijão, seco, Brown (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 78,
+      "name": "feijão, seco, Tan (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 79,
+      "name": "feijão, seco, Light Tan (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 80,
+      "name": "feijão, seco, Carioca (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 81,
+      "name": "feijão, seco, Cranberry (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 82,
+      "name": "feijão, seco, Light vermelho Kidney (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 83,
+      "name": "feijão, seco, Pink (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 84,
+      "name": "feijão, seco, Dark vermelho Kidney (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 85,
+      "name": "feijão, seco, Navy (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 86,
+      "name": "feijão, seco, Small branco (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 87,
+      "name": "feijão, seco, Small vermelho (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 88,
+      "name": "feijão, seco, preto (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 89,
+      "name": "feijão, seco, Pinto (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 90,
+      "name": "feijão, seco, Great Northern (0% moisture)",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
       ]
     },
     {
@@ -107,6 +242,20 @@
       ]
     },
     {
+      "row": 101,
+      "name": "manteiga, stick, unsalted",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 109,
+      "name": "manteiga, stick, salted",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
       "row": 126,
       "name": "Oil, peanut",
       "errors": [
@@ -135,43 +284,50 @@
       ]
     },
     {
+      "row": 292,
+      "name": "trigo para quibe, seco, cru",
+      "errors": [
+        "preparação composta sem receita completa ou produto embalado com marca e código de barras"
+      ]
+    },
+    {
       "row": 316,
-      "name": "frango, drumstick, meat and skin, cru",
+      "name": "frango, coxa inferior, carne and pele, cru",
       "errors": [
         "carbs negativo"
       ]
     },
     {
       "row": 317,
-      "name": "frango, thigh, meat and skin, cru",
+      "name": "frango, coxa, carne and pele, cru",
       "errors": [
         "carbs negativo"
       ]
     },
     {
       "row": 318,
-      "name": "frango, wing, meat and skin, cru",
+      "name": "frango, wing, carne and pele, cru",
       "errors": [
         "carbs negativo"
       ]
     },
     {
       "row": 319,
-      "name": "frango, breast, meat and skin, cru",
+      "name": "frango, peito, carne and pele, cru",
       "errors": [
         "carbs negativo"
       ]
     },
     {
       "row": 320,
-      "name": "Lamb, ground, cru",
+      "name": "Lamb, moído, cru",
       "errors": [
         "carbs negativo"
       ]
     },
     {
       "row": 321,
-      "name": "Bison, ground, cru",
+      "name": "Bison, moído, cru",
       "errors": [
         "carbs negativo"
       ]
@@ -185,9 +341,86 @@
     },
     {
       "row": 326,
-      "name": "carne suína, belly, with skin, cru",
+      "name": "carne suína, belly, com casca, cru",
       "errors": [
         "carbs negativo"
+      ]
+    },
+    {
+      "row": 327,
+      "name": "Pawpaw, descascado, seeded, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 328,
+      "name": "Squash, pie pumpkin, descascado, seeded, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 329,
+      "name": "Squash, spaghetti, descascado, seeded, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 330,
+      "name": "Rutabaga, descascado, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 331,
+      "name": "amora, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 332,
+      "name": "Tomatillos, dehusked, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 333,
+      "name": "Cabbage, napa, leaf, destemmed, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 334,
+      "name": "Leeks, bulb and greens, root removed, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 335,
+      "name": "verde cebola, (scallion), bulb and greens, root removed, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 336,
+      "name": "Shallots, bulb, descascado, root removed, cru",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 337,
+      "name": "Juice, prune, shelf-stable",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
       ]
     },
     {
@@ -198,17 +431,24 @@
       ]
     },
     {
-      "row": 344,
-      "name": "Halibut, frozen, wild caught",
+      "row": 339,
+      "name": "Juice, tart cherry, from concentrate, shelf-stable",
+      "errors": [
+        "energia ausente e macronutrientes incompletos"
+      ]
+    },
+    {
+      "row": 361,
+      "name": "Tuna, ahi or yellowfin, congelado, wild caught",
       "errors": [
         "carbs negativo"
       ]
     },
     {
-      "row": 361,
-      "name": "Tuna, ahi or yellowfin, frozen, wild caught",
+      "row": 363,
+      "name": "Watermelon, seedless, flesh only, cru",
       "errors": [
-        "carbs negativo"
+        "energia ausente e macronutrientes incompletos"
       ]
     }
   ]
