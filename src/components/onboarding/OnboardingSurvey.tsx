@@ -42,6 +42,7 @@ type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 type RaccoonPose = 'welcome' | 'thinking' | 'intellectual' | 'curious' | 'sporty' | 'cloud' | 'celebrate';
 
 const ONBOARDING_DRAFT_KEY = 'nutrifam_onboarding_draft';
+const ONBOARDING_DRAFT_VERSION = 2;
 
 function parseSurveyNumber(val: string): number {
   if (!val) return 0;
@@ -82,7 +83,9 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
   const draft = (() => {
     try {
       const raw = draftKey ? sessionStorage.getItem(draftKey) : null;
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.version === ONBOARDING_DRAFT_VERSION ? parsed : null;
     } catch {
       return null;
     }
@@ -99,35 +102,40 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
   const [userName, setUserName] = useState<string>(() => draft?.userName || existingProfile?.name || '');
   const [petName, setPetName] = useState<string>(() => draft?.petName || existingProfile?.petName || 'FoodBud');
 
-  // Biometrics & Goals (Pre-fill with existing values if redoing, or wait for fresh input)
+  // Defaults from a newly-created database row are not survey answers. Profile
+  // values are reused only when redoing an assessment that was completed before.
   const [goalType, setGoalType] = useState<'Lose weight' | 'Maintain weight' | 'Gain muscle' | null>(
-    () => draft?.goalType || existingProfile?.goalType || null
+    () => draft?.goalType || (isUserRedoing ? existingProfile?.goalType : null) || null
   );
-  const [gender, setGender] = useState<'male' | 'female' | null>(() => draft?.gender || existingProfile?.gender || null);
-  const [ageInput, setAgeInput] = useState<string>(() => draft?.ageInput || (existingProfile?.age ? String(existingProfile.age) : ''));
+  const [gender, setGender] = useState<'male' | 'female' | null>(
+    () => draft?.gender || (isUserRedoing ? existingProfile?.gender : null) || null
+  );
+  const [ageInput, setAgeInput] = useState<string>(
+    () => draft?.ageInput || (isUserRedoing && existingProfile?.age ? String(existingProfile.age) : '')
+  );
   const [heightInput, setHeightInput] = useState<string>(
-    () => draft?.heightInput || (existingProfile?.heightCm && existingProfile.heightCm > 0 ? String(existingProfile.heightCm) : '')
+    () => draft?.heightInput || (isUserRedoing && existingProfile?.heightCm && existingProfile.heightCm > 0 ? String(existingProfile.heightCm) : '')
   );
   const [currentWeightInput, setCurrentWeightInput] = useState<string>(
     () =>
       draft?.currentWeightInput ||
-      (existingProfile?.currentWeightKg && existingProfile.currentWeightKg > 0
+      (isUserRedoing && existingProfile?.currentWeightKg && existingProfile.currentWeightKg > 0
         ? String(existingProfile.currentWeightKg)
         : '')
   );
   const [goalWeightInput, setGoalWeightInput] = useState<string>(
     () =>
       draft?.goalWeightInput ||
-      (existingProfile?.goalWeightKg && existingProfile.goalWeightKg > 0 ? String(existingProfile.goalWeightKg) : '')
+      (isUserRedoing && existingProfile?.goalWeightKg && existingProfile.goalWeightKg > 0 ? String(existingProfile.goalWeightKg) : '')
   );
-  const [pace, setPace] = useState<'gentle' | 'standard' | 'fast'>(
+  const [pace, setPace] = useState<'gentle' | 'standard' | 'fast' | null>(
     () =>
       draft?.pace ||
-      existingProfile?.pace ||
-      (existingProfile?.weeklyPaceKg === 0.25 ? 'gentle' : existingProfile?.weeklyPaceKg === 0.75 ? 'fast' : 'standard')
+      (isUserRedoing ? existingProfile?.pace : undefined) ||
+      (isUserRedoing ? (existingProfile?.weeklyPaceKg === 0.25 ? 'gentle' : existingProfile?.weeklyPaceKg === 0.75 ? 'fast' : 'standard') : null)
   );
   const [activityLevel, setActivityLevel] = useState<'sedentary' | 'light' | 'moderate' | 'high' | 'very_high' | null>(
-    () => draft?.activityLevel || existingProfile?.activityLevel || null
+    () => draft?.activityLevel || (isUserRedoing ? existingProfile?.activityLevel : null) || null
   );
 
   // Save draft continuously so OAuth redirects or reload never drops survey state
@@ -137,6 +145,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
       sessionStorage.setItem(
         draftKey,
         JSON.stringify({
+          version: ONBOARDING_DRAFT_VERSION,
           currentStep,
           userName,
           petName,
@@ -367,6 +376,10 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
           setStepError('Por favor, informe seu peso meta desejado.');
           return;
         }
+        if (!pace) {
+          setStepError('Por favor, selecione o ritmo semanal desejado.');
+          return;
+        }
       }
       setCurrentStep(6);
       return;
@@ -387,7 +400,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
         goalWeightKg: goalType === 'Maintain weight' ? currentWeightKg : goalWeightKg,
         goalType: goalType || 'Lose weight',
         activityLevel: activityLevel || 'moderate',
-        pace
+        pace: pace || 'standard'
       });
       setCalculatedPlan(assessment);
 
@@ -490,7 +503,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
       goalWeightKg: validGoalWeight,
       goalType: goalType || 'Lose weight',
       activityLevel: activityLevel || 'moderate',
-      pace
+      pace: pace || 'standard'
     });
 
     const completedProfile: UserProfile = {
@@ -512,8 +525,8 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
       gender: gender || existingProfile?.gender || 'male',
       age: parsedAge || existingProfile?.age || 25,
       activityLevel: activityLevel || existingProfile?.activityLevel || 'moderate',
-      weeklyPaceKg: pace === 'gentle' ? 0.25 : pace === 'standard' ? 0.5 : 0.75,
-      pace,
+      weeklyPaceKg: pace === 'gentle' ? 0.25 : pace === 'fast' ? 0.75 : 0.5,
+      pace: pace || 'standard',
       petName: petName.trim().slice(0, 14) || existingProfile?.petName || 'FoodBud',
       petLevel: existingProfile?.petLevel || 1,
       petXp: existingProfile?.petXp !== undefined ? existingProfile.petXp : 10,
