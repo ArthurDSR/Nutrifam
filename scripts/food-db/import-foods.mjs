@@ -15,6 +15,7 @@ if (!args.input) {
 }
 
 const source = String(args.source || 'canonical').toLowerCase();
+const reviewedLabels = source === 'manufacturer' && args['verified-labels'] === true;
 const supportedSources = new Set(['canonical', 'tbca', 'usda', 'manufacturer']);
 if (!supportedSources.has(source)) {
   console.error(`Fonte inválida: ${source}. Use canonical, tbca, usda ou manufacturer.`);
@@ -88,6 +89,20 @@ const number = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const labelNumber = (value) => {
+  const normalized = String(value ?? '').trim().replace(',', '.');
+  return /^-?\d+(\.\d+)?$/.test(normalized) ? Number(normalized) : NaN;
+};
+
+const isValidGtin = (value) => {
+  if (!/^(\d{8}|\d{12,14})$/.test(value)) return false;
+  const digits = [...value].map(Number);
+  const sum = digits.slice(0, -1).reverse().reduce(
+    (total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0
+  );
+  return (10 - sum % 10) % 10 === digits.at(-1);
+};
+
 const first = (row, names) => {
   for (const name of names) {
     const value = row[name];
@@ -149,14 +164,19 @@ function mapRow(row, index) {
   const originalName = String(first(row, aliases.name) || '').trim();
   const name = source === 'usda' ? translateUsdaDescription(originalName) : originalName;
   const brand = String(first(row, aliases.brand) || '').trim();
-  const barcode = String(first(row, aliases.barcode) || '').replace(/\D/g, '');
-  const servingGrams = number(first(row, aliases.servingGrams)) || 100;
+  const barcode = String(first(row, aliases.barcode) || '').replace(/\s/g, '');
+  const sourceUrl = String(first(row, ['sourceUrl', 'source_url']) || '');
+  const manufacturer = source === 'manufacturer';
+  const servingGrams = manufacturer
+    ? labelNumber(first(row, aliases.servingGrams))
+    : number(first(row, aliases.servingGrams)) || 100;
   const sourceId = String(first(row, aliases.id) || `${index + 1}`);
   const hash = createHash('sha1').update(`${source}:${sourceId}:${name}:${brand}`).digest('hex').slice(0, 12);
   const nova = Math.round(number(first(row, aliases.novaGroup)));
 
   const usdaNutrients = Array.isArray(row.foodNutrients) ? row.foodNutrients : [];
   const nutrient = (names, fallbackAliases, unit) => {
+    if (manufacturer) return labelNumber(first(row, fallbackAliases));
     for (const entry of usdaNutrients) {
       const nutrientName = normalizeText(entry.nutrient?.name || entry.nutrientName);
       const nutrientUnit = normalizeText(entry.nutrient?.unitName || entry.unitName);
@@ -181,11 +201,11 @@ function mapRow(row, index) {
   const officialCalories = nutrient(['energy', 'energy kcal'], aliases.calories, 'kcal');
   const hasCompleteMacros = source !== 'usda'
     || (hasUsdaNutrient(proteinNames) && hasUsdaNutrient(carbNames) && hasUsdaNutrient(fatNames));
-  const calories = officialCalories > 0
+  const calories = manufacturer || officialCalories > 0
     ? officialCalories
     : hasCompleteMacros ? Math.round(protein * 4 + carbs * 4 + fat * 9) : 0;
   const categoryDescription = normalizeText(row.foodCategory?.description || '');
-  const foodGroup = categoryDescription.includes('fruit') ? 'fruit'
+  const inferredFoodGroup = categoryDescription.includes('fruit') ? 'fruit'
     : categoryDescription.includes('vegetable') ? 'vegetable'
       : categoryDescription.includes('dairy') ? 'dairy'
         : categoryDescription.includes('legume') ? 'legume'
@@ -194,6 +214,9 @@ function mapRow(row, index) {
               : categoryDescription.includes('meat') || categoryDescription.includes('poultry') || categoryDescription.includes('fish') ? 'protein'
                 : categoryDescription.includes('fat') || categoryDescription.includes('oil') ? 'fat_oil'
                   : 'other';
+  const declaredFoodGroup = first(row, ['foodGroup', 'food_group']);
+  const foodGroup = ['fruit', 'vegetable', 'grain', 'protein', 'dairy', 'legume', 'nuts_seeds', 'fat_oil', 'other']
+    .includes(declaredFoodGroup) ? declaredFoodGroup : inferredFoodGroup;
 
   const recipeIngredients = Array.isArray(row.recipeIngredients) ? row.recipeIngredients : undefined;
   const recipeYieldPortions = number(row.recipeYieldPortions);
@@ -202,7 +225,7 @@ function mapRow(row, index) {
     name,
     ...(brand ? { brand } : {}),
     calories,
-    energySource: officialCalories > 0 ? 'analytical' : 'calculated_4_4_9',
+    energySource: manufacturer ? 'label' : officialCalories > 0 ? 'analytical' : 'calculated_4_4_9',
     servingSize: String(first(row, aliases.servingSize) || `${servingGrams} g`),
     servingGrams,
     protein,
@@ -215,7 +238,8 @@ function mapRow(row, index) {
     foodGroup,
     catalogSource: source === 'manufacturer' ? 'manufacturer' : source,
     normalizedName: normalizeText(`${name} ${brand}`),
-    verificationStatus: source === 'manufacturer' ? 'pending' : 'verified',
+    verificationStatus: manufacturer && !reviewedLabels ? 'pending' : 'verified',
+    ...(sourceUrl ? { sourceUrl } : {}),
     ...(source === 'usda' && originalName !== name ? { sourceName: originalName } : {}),
     ...(row.isRecipe === true && recipeIngredients?.length && recipeYieldPortions > 0
       ? { isRecipe: true, recipeIngredients, recipeYieldPortions }
@@ -223,34 +247,45 @@ function mapRow(row, index) {
   };
 }
 
-const isCompositeDish = (food) => {
-  const normalized = ` ${normalizeText(food.name)} `;
-  return catalogPolicy.compositeDishTerms.some((term) => normalized.includes(` ${term} `));
+const isUnverifiedPreparation = (food) => {
+  const brand = normalizeText(food.brand);
+  const unattributed = catalogPolicy.unattributedSourcePrefixes.some(
+    (prefix) => brand === prefix || brand.startsWith(`${prefix} `)
+  );
+  const composite = [food.name, food.sourceName].some((name) => {
+    const normalized = ` ${normalizeText(name)} `;
+    return catalogPolicy.compositeDishTerms.some((term) => normalized.includes(` ${term} `));
+  });
+  if (!unattributed && !composite) return false;
+  const recipe = food.isRecipe === true && Number.isFinite(food.recipeYieldPortions) && food.recipeYieldPortions > 0
+    && food.recipeIngredients?.length && food.recipeIngredients.every(
+      (item) => typeof item?.name === 'string' && item.name.trim() && Number.isFinite(item.grams) && item.grams > 0
+    );
+  const packageIdentified = !unattributed && brand && isValidGtin(food.barcode || '');
+  return !recipe && !packageIdentified;
 };
 
 function validate(food) {
   const errors = [];
   if (food.name.length < 2) errors.push('nome ausente');
-  if (food.servingGrams <= 0 || food.servingGrams > 5000) errors.push('porção inválida');
+  if (!Number.isFinite(food.servingGrams) || food.servingGrams <= 0 || food.servingGrams > 5000) errors.push('porção inválida');
   for (const field of ['calories', 'protein', 'carbs', 'fat', 'fiber']) {
-    if (food[field] < 0) errors.push(`${field} negativo`);
+    if (!Number.isFinite(food[field]) || food[field] < 0) errors.push(`${field} ausente ou inválido`);
   }
   const factor = 100 / food.servingGrams;
   if (food.calories * factor > 1000) errors.push('calorias acima de 1000 kcal/100g');
   if (food.protein * factor > 100 || food.carbs * factor > 100 || food.fat * factor > 100 || food.fiber * factor > 100) {
     errors.push('macronutriente acima de 100g/100g');
   }
-  if (!food.calories && !food.protein && !food.carbs && !food.fat && !food.fiber) errors.push('sem dados nutricionais');
-  else if (!food.calories) errors.push('energia ausente e macronutrientes incompletos');
-  if (source === 'manufacturer' && (!food.brand || !food.barcode)) {
-    errors.push('produto de fabricante exige marca e código de barras');
+  if (source === 'manufacturer') {
+    if (!food.brand || !isValidGtin(food.barcode || '')) errors.push('produto de fabricante exige marca e GTIN válido');
+    if (reviewedLabels && !URL.canParse(food.sourceUrl || '')) errors.push('rótulo revisado exige URL da fonte');
+  } else {
+    if (!food.calories && !food.protein && !food.carbs && !food.fat && !food.fiber) errors.push('sem dados nutricionais');
+    else if (!food.calories) errors.push('energia ausente e macronutrientes incompletos');
   }
-  if (isCompositeDish(food)) {
-    const completeRecipe = food.isRecipe && food.recipeYieldPortions > 0 && food.recipeIngredients?.length;
-    const identifiedPackage = food.barcode && food.brand;
-    if (!completeRecipe && !identifiedPackage) {
-      errors.push('preparação composta sem receita completa ou produto embalado com marca e código de barras');
-    }
+  if (isUnverifiedPreparation(food)) {
+    errors.push('preparação composta ou fonte genérica sem receita completa ou produto embalado identificado');
   }
   return errors;
 }
@@ -281,16 +316,15 @@ usableRows.forEach((row, index) => {
 let existing = [];
 try {
   existing = JSON.parse(await readFile(outputPath, 'utf8'));
-} catch {}
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
 // Each import is a snapshot replacement for its source. This prevents stale
 // records from surviving when normalization or validation rules evolve.
-existing = existing.filter((food) => food.catalogSource !== source);
+if (source !== 'manufacturer') existing = existing.filter((food) => food.catalogSource !== source);
 const merged = new Map();
 for (const food of [...existing, ...accepted]) {
-  const compositeAllowed = !isCompositeDish(food)
-    || (food.isRecipe && food.recipeYieldPortions > 0 && food.recipeIngredients?.length)
-    || (food.barcode && food.brand);
-  if (!compositeAllowed) continue;
+  if (isUnverifiedPreparation(food)) continue;
   const key = food.barcode ? `barcode:${food.barcode}` : `${food.normalizedName}:${food.servingGrams}`;
   merged.set(key, food);
 }
@@ -312,6 +346,7 @@ const report = {
   quality: {
     zeroCalories: catalog.filter((food) => !food.calories).length,
     analyticalEnergy: catalog.filter((food) => food.energySource === 'analytical').length,
+    labelEnergy: catalog.filter((food) => food.energySource === 'label').length,
     calculatedEnergy: catalog.filter((food) => food.energySource === 'calculated_4_4_9').length,
     groupCoverage
   },

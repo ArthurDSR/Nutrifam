@@ -113,6 +113,7 @@ function sameValue(left: unknown, right: unknown): boolean {
 
 export async function flushPendingChanges(userId: string): Promise<boolean> {
   if (flushingUserId) return false;
+  if (getPendingChanges(userId).length === 0) return true;
   const supabase = getSupabase();
   if (!supabase || !navigator.onLine) return false;
   flushingUserId = userId;

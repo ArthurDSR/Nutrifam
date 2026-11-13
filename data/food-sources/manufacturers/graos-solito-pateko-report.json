@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-11-13T12:03:12.344Z",
+  "source": "manufacturer",
+  "input": "data/food-sources/manufacturers/graos-solito-pateko.json",
+  "received": 15,
+  "accepted": 15,
+  "rejected": 0,
+  "catalogTotal": 317,
+  "policyVersion": "2026.09.1",
+  "quality": {
+    "zeroCalories": 0,
+    "analyticalEnergy": 86,
+    "labelEnergy": 15,
+    "calculatedEnergy": 216,
+    "groupCoverage": {
+      "dairy": 39,
+      "fat_oil": 1,
+      "fruit": 44,
+      "grain": 49,
+      "legume": 25,
+      "nuts_seeds": 19,
+      "other": 26,
+      "protein": 35,
+      "vegetable": 79
+    }
+  },
+  "rejectionDetails": []
+}

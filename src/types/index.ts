@@ -19,6 +19,7 @@ export interface FoodItem {
   catalogSource?: 'taco' | 'tbca' | 'usda' | 'brazilian' | 'manufacturer' | 'canonical' | 'user' | 'legacy';
   normalizedName?: string;
   sourceName?: string;
+  sourceUrl?: string;
   energySource?: 'analytical' | 'label' | 'calculated_4_4_9';
   foodGroup?: 'fruit' | 'vegetable' | 'grain' | 'protein' | 'dairy' | 'legume' | 'nuts_seeds' | 'fat_oil' | 'other';
   verificationStatus?: 'verified' | 'pending' | 'user';

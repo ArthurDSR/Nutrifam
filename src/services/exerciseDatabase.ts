@@ -1,8 +1,11 @@
 import { Exercise, MuscleCategory } from '../types/workout';
 import { EXERCISE_GIF_MAP } from './exerciseGifMap';
 import { loadExercisesFromSupabase } from './supabaseClient';
+import { ADDITIONAL_EXERCISES } from '../data/additionalExercises';
+import { normalizeCatalogText } from './localFoodCatalogText';
 
 export const EXERCISE_DATABASE: Exercise[] = [
+  ...ADDITIONAL_EXERCISES,
   {
     id: 'chest_bench_press_barbell',
     name: 'Supino Reto com Barra',
@@ -1089,16 +1092,16 @@ export function getExercisesByCategory(category: MuscleCategory): Exercise[] {
 }
 
 export function searchExercises(query: string, category?: MuscleCategory): Exercise[] {
-  const cleanQuery = query.toLowerCase().trim();
+  const cleanQuery = normalizeCatalogText(query);
   const catalog = dynamicCatalog && dynamicCatalog.length > 0 ? dynamicCatalog : EXERCISE_DATABASE;
   return catalog.filter((e) => {
     const matchesCat = !category || e.category === category;
     if (!matchesCat) return false;
     if (!cleanQuery) return true;
     return (
-      e.name.toLowerCase().includes(cleanQuery) ||
-      (e.nameEn && e.nameEn.toLowerCase().includes(cleanQuery)) ||
-      e.targetMuscle.toLowerCase().includes(cleanQuery)
+      normalizeCatalogText(e.name).includes(cleanQuery) ||
+      normalizeCatalogText(e.nameEn || '').includes(cleanQuery) ||
+      normalizeCatalogText(e.targetMuscle).includes(cleanQuery)
     );
   }).map(enrichExercise);
 }

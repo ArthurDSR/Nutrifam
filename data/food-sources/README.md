@@ -12,7 +12,23 @@ npm run food-db:import -- --input=data/food-sources/fabricante.csv --source=manu
 
 O CSV pode usar vírgula ou ponto e vírgula e nomes de colunas em português ou inglês. JSON exportado pela USDA também pode usar `foodNutrients`. Para produtos industrializados, use o modelo `manufacturer-template.csv`; o código de barras é a chave preferencial de deduplicação.
 
-Cada execução mescla os registros aceitos com o catálogo gerado. O relatório em `import-report.json` lista totais e rejeições. Registros de fabricantes entram como `pending` até revisão, enquanto fontes oficiais entram como `verified`.
+Cada execução substitui o lote anterior da mesma fonte, exceto fabricantes. Os lotes de fabricantes são acumulados por GTIN, de modo que a importação de uma empresa preserve os produtos já cadastrados de outras. O relatório em `import-report.json` lista totais e rejeições.
+
+## Lotes por fabricante
+
+O lote de grãos da Solito (incluindo Vitabon) e da Patéko registra cada embalagem por GTIN e mantém o link da ficha oficial. As quantidades nutricionais são por porção em gramas do produto cru, conforme as fichas.
+
+```powershell
+npm run food-db:import -- --input=data/food-sources/manufacturers/graos-solito-pateko.json --source=manufacturer --verified-labels --report=data/food-sources/manufacturers/graos-solito-pateko-report.json
+```
+
+Para novos lotes, confira a variante, o GTIN da embalagem de venda e os valores da mesma coluna da tabela nutricional. Registre a ficha oficial em `sourceUrl`. Use `--verified-labels` depois dessa conferência. O importador rejeita GTIN com dígito verificador inválido e campos nutricionais ausentes.
+
+## Coleta de rótulos no mercado
+
+Abra a aba de código de barras e escolha **Cadastrar produto pelo rótulo**. Você pode escanear ou digitar o GTIN. Com um provedor de IA configurado, a foto da tabela preenche os campos para revisão. O preenchimento manual também funciona. Confira a marca, a variante, a unidade e todos os números da mesma coluna antes de salvar.
+
+Os produtos ficam em **Meus alimentos** e podem ser consultados pelo GTIN na mesma conta. Use **Exportar rótulos cadastrados** na aba do leitor para obter o JSON e encaminhá-lo para revisão antes de inclusão no catálogo compartilhado. Para bebidas, preserve a porção em ml no campo `servingSize`.
 
 ## Preparações compostas
 

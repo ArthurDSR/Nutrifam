@@ -164,7 +164,7 @@ export async function loadProfileFromSupabase(userId?: string): Promise<UserProf
 
     const currentWeight = Number(data.current_weight_kg) || 0;
     const goalWeight = Number(data.goal_weight_kg) || 0;
-    const startWeight = Number(data.start_weight_kg) || currentWeight || 0;
+    const startWeight = Number(data.start_weight_kg) || 0;
 
     return {
       id: data.id,
@@ -672,7 +672,8 @@ export async function loadCustomFoodsFromSupabase(userId?: string): Promise<Food
       fiber: Number(row.fiber),
       colorDot: row.color_dot,
       category: row.category,
-      barcode: row.barcode
+      barcode: row.barcode,
+      ...(row.id.startsWith('label_') ? { catalogSource: 'user' as const, energySource: 'label' as const } : {})
     }));
   } catch (err) {
     console.warn('Error loading custom foods from Supabase:', err);

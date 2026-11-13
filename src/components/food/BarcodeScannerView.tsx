@@ -1,14 +1,18 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, ScanLine, Search, Loader2, RefreshCw, CheckCircle2, Zap } from 'lucide-react';
-import { fetchProductByBarcode } from '../../services/localBarcodeService';
-import { ProductEvaluation } from '../../types';
+import { Camera, Search, Loader2, RefreshCw, CheckCircle2, Zap } from 'lucide-react';
+import { findLocalFoodByBarcode } from '../../services/localFoodCatalog';
+import { FoodItem } from '../../types';
 import { useTheme } from '../../services/themeService';
+import { normalizeGtin } from '../../services/nutritionLabelService';
 
 interface BarcodeScannerViewProps {
-  onProductFound: (product: ProductEvaluation) => void;
+  onProductFound: (product: FoodItem) => void;
+  onRegisterLabel: (barcode: string) => void;
+  onExportLabels?: () => void;
+  findPersonalProduct: (barcode: string) => FoodItem | undefined;
 }
 
-export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProductFound }) => {
+export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProductFound, onRegisterLabel, onExportLabels, findPersonalProduct }) => {
   const { activeColor } = useTheme();
   const [manualBarcode, setManualBarcode] = useState('');
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -17,9 +21,12 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
   const [scannedSuccessCode, setScannedSuccessCode] = useState<string | null>(null);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
+  const [lookupError, setLookupError] = useState('');
+  const [unknownCode, setUnknownCode] = useState('');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraRequest = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
   const isScanningRef = useRef<boolean>(false);
   const lastScannedCodeRef = useRef<string | null>(null);
@@ -47,8 +54,13 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
   };
 
   const handleLookup = useCallback(async (code: string) => {
-    const cleanCode = code.trim();
-    if (!cleanCode) return;
+    const cleanCode = normalizeGtin(code);
+    if (!cleanCode) {
+      setLookupError('Confira os dígitos do código de barras.');
+      return;
+    }
+    setLookupError('');
+    setUnknownCode('');
 
     // Prevent re-scanning the same code within 3 seconds
     const now = Date.now();
@@ -71,17 +83,16 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
     setIsLoading(true);
 
     try {
-      const product = await fetchProductByBarcode(cleanCode);
-      onProductFound(product);
-    } catch (err: any) {
-      alert(err.message || `Produto com código "${cleanCode}" não encontrado na base de alimentos.`);
+      const product = findPersonalProduct(cleanCode) ?? findLocalFoodByBarcode(cleanCode);
+      if (product) onProductFound(product);
+      else setUnknownCode(cleanCode);
     } finally {
       setIsLoading(false);
       setTimeout(() => {
         setScannedSuccessCode(null);
       }, 2000);
     }
-  }, [onProductFound]);
+  }, [findPersonalProduct, onProductFound]);
 
   // Continuous scanning loop using native BarcodeDetector API
   const startDetectionLoop = useCallback(() => {
@@ -91,7 +102,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
     if (BarcodeDetectorClass) {
       try {
         detector = new BarcodeDetectorClass({
-          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code']
+          formats: ['ean_13', 'ean_8', 'upc_a']
         });
       } catch (err) {
         console.warn('BarcodeDetector instantiation failed:', err);
@@ -111,7 +122,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
           const barcodes = await detector.detect(videoRef.current);
           if (barcodes && barcodes.length > 0) {
             const rawValue = barcodes[0].rawValue;
-            if (rawValue && rawValue !== lastScannedCodeRef.current) {
+            if (rawValue && normalizeGtin(rawValue) && rawValue !== lastScannedCodeRef.current) {
               handleLookup(rawValue);
             }
           }
@@ -130,6 +141,11 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
 
   const startCamera = async () => {
     setCameraError(null);
+    if (!('BarcodeDetector' in window)) {
+      setCameraError('Este navegador não lê códigos pela câmera. Digite os números da embalagem.');
+      return;
+    }
+    const request = ++cameraRequest.current;
     try {
       const constraints: MediaStreamConstraints = {
         video: {
@@ -140,6 +156,10 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (request !== cameraRequest.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
 
       // Check if torch/flashlight is supported
@@ -155,8 +175,10 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
         await videoRef.current.play();
       }
 
-      setIsCameraActive(true);
+      if (request === cameraRequest.current) setIsCameraActive(true);
     } catch (err: any) {
+      if (request !== cameraRequest.current) return;
+      stopCamera();
       console.warn('Camera access error:', err);
       setCameraError('Permissão de câmera não concedida ou dispositivo sem câmera. Utilize a digitação manual ou os exemplos rápidos abaixo.');
       setIsCameraActive(false);
@@ -164,6 +186,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
   };
 
   const stopCamera = () => {
+    ++cameraRequest.current;
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
@@ -205,12 +228,6 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
     }
   }, [isCameraActive, startDetectionLoop]);
 
-  // Sample quick barcodes
-  const sampleBarcodes = [
-    { name: 'Chocolate 75% Cacau Amma', code: '7898943180015', score: 65, color: 'bg-[#E5A93C]' },
-    { name: 'Macarrão SYMBOL', code: '7898099887766', score: 72, color: 'bg-emerald-500' },
-    { name: 'Leite Piracanjuba Zero Lactose', code: '7898215150022', score: 80, color: 'bg-emerald-500' }
-  ];
 
   return (
     <div
@@ -219,15 +236,9 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
     >
       {/* Viewfinder Frame */}
       <div className="relative w-full h-64 bg-slate-950 rounded-3xl overflow-hidden shadow-inner flex flex-col items-center justify-center border border-[#AEBDB5]/30 dark:border-[#394842]">
+        <video ref={videoRef} className={`absolute inset-0 w-full h-full object-cover ${isCameraActive ? '' : 'invisible'}`} playsInline muted autoPlay />
         {isCameraActive ? (
           <>
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              playsInline
-              muted
-              autoPlay
-            />
             {/* Flashlight toggle if supported */}
             {torchSupported && (
               <button
@@ -247,7 +258,7 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
             <p className="text-xs text-slate-400 max-w-xs">
               {cameraError || 'Iniciando câmera para leitura de código de barras...'}
             </p>
-            {cameraError && (
+            {cameraError && 'BarcodeDetector' in window && (
               <button
                 onClick={startCamera}
                 className="mt-3 px-4 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-semibold inline-flex items-center gap-1.5"
@@ -306,9 +317,10 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
         <div className="relative flex items-center">
           <input
             type="text"
+            inputMode="numeric"
             value={manualBarcode}
             onChange={(e) => setManualBarcode(e.target.value)}
-            placeholder="Ex: 7898943180015"
+            placeholder="Ex: 7896062602008"
             className="w-full pl-4 pr-12 py-2.5 bg-white dark:bg-[#232D29] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-full text-xs font-semibold text-[#3F4B46] dark:text-[#EDF2EF] placeholder-[#6F7C76]/60 dark:placeholder-[#A8B8B1]/60 focus:outline-none focus:border-[#6F7C76] shadow-2xs font-mono"
             onKeyDown={(e) => e.key === 'Enter' && handleLookup(manualBarcode)}
           />
@@ -323,32 +335,15 @@ export const BarcodeScannerView: React.FC<BarcodeScannerViewProps> = ({ onProduc
         </div>
       </div>
 
-      {/* Quick Test Barcodes matching Screen 5f */}
-      <div className="mt-5 pt-3 border-t border-[#AEBDB5]/20 dark:border-[#394842]">
-        <span className="text-[11px] font-bold text-[#6F7C76] dark:text-[#A8B8B1] uppercase tracking-wider block mb-2">
-          Testar com produtos reais do design:
-        </span>
-        <div className="space-y-2">
-          {sampleBarcodes.map((item) => (
-            <button
-              key={item.code}
-              onClick={() => handleLookup(item.code)}
-              className="w-full p-3 bg-white dark:bg-[#232D29] hover:bg-[#ECEFE7] dark:hover:bg-[#2B3732] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-2xl flex items-center justify-between text-left transition-transform active:scale-98 shadow-2xs"
-            >
-              <div>
-                <span className="font-bold text-[#3F4B46] dark:text-[#EDF2EF] text-xs block">{item.name}</span>
-                <span className="text-[10px] text-[#6F7C76] dark:text-[#A8B8B1] font-mono">Código: {item.code}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-[11px] font-extrabold text-white px-2 py-0.5 rounded-lg ${item.color}`}>
-                  Score {item.score}
-                </span>
-                <ScanLine className="w-4 h-4 text-[#6F7C76] dark:text-[#A8B8B1]" />
-              </div>
-            </button>
-          ))}
-        </div>
+      <div className="mt-3 space-y-2 text-xs text-[#3F4B46] dark:text-[#EDF2EF]">
+        {lookupError && <p role="alert">{lookupError}</p>}
+        {unknownCode && <p role="status">Código {unknownCode} ainda não cadastrado.</p>}
+        <button type="button" className="block font-bold underline" onClick={() => onRegisterLabel(unknownCode || manualBarcode)}>
+          Cadastrar produto pelo rótulo
+        </button>
+        {onExportLabels && <button type="button" className="block font-bold underline" onClick={onExportLabels}>Exportar rótulos cadastrados</button>}
       </div>
+
     </div>
   );
 };

@@ -29,6 +29,8 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
 }) => {
   const { activeColor } = useTheme();
   const baseGrams = food.servingGrams || 100;
+  const measurementUnit = /\bml\b/i.test(food.servingSize) ? 'ml' : 'g';
+  const isLabel = food.energySource === 'label' || food.id.startsWith('label_');
   
   // Extract unit name from food definition or string
   const servingUnit = food.servingUnitName || (
@@ -53,10 +55,10 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
   const [isAdded, setIsAdded] = useState(false);
 
   // Calculate effective grams based on current unit mode
-  const effectiveGrams = unitMode === 'portion' ? Math.round(portions * baseGrams) : grams;
+  const effectiveGrams = unitMode === 'portion' ? Number((portions * baseGrams).toFixed(2)) : grams;
 
   // Scale multiplier based on effective grams
-  const multiplier = Math.max(0.05, effectiveGrams / baseGrams);
+  const multiplier = effectiveGrams / baseGrams;
 
   const cal = Math.round(food.calories * multiplier);
   const prot = Number((food.protein * multiplier).toFixed(1));
@@ -109,7 +111,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
 
   const handleUnitModeToggle = (mode: 'portion' | 'grams') => {
     if (mode === 'grams') {
-      setGrams(Math.round(portions * baseGrams));
+      setGrams(effectiveGrams);
     } else {
       setPortions(Number((grams / baseGrams).toFixed(1)) || 1);
     }
@@ -120,8 +122,8 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
     const pluralSuffix = portions > 1 && !servingUnit.endsWith('s') && !servingUnit.includes(' ') ? 's' : '';
     const formattedServingSize =
       unitMode === 'portion'
-        ? `${portions} ${servingUnit}${pluralSuffix} (${effectiveGrams} g)`
-        : `${effectiveGrams} g`;
+        ? `${portions} ${servingUnit}${pluralSuffix} (${effectiveGrams} ${measurementUnit})`
+        : `${effectiveGrams} ${measurementUnit}`;
 
     onAddFood(
       {
@@ -134,9 +136,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
         servingSize: formattedServingSize,
         servingGrams: effectiveGrams,
         servingUnitName: servingUnit,
-        novaGroup,
-        healthScore,
-        preservativesCount
+        ...(!isLabel ? { novaGroup, healthScore, preservativesCount } : {})
       },
       effectiveGrams
     );
@@ -210,7 +210,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
               <span>{cal} kcal</span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            {!isLabel && <div className="flex items-center gap-1.5">
               {/* Health Score Pill */}
               <div
                 className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-2xs ${
@@ -239,7 +239,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
               >
                 <span>NOVA {novaGroup}</span>
               </div>
-            </div>
+            </div>}
           </div>
 
           {/* DUAL UNIT SELECTOR CARD: Porção do Fabricante vs Gramas */}
@@ -269,7 +269,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                 }`}
               >
                 <Scale className="w-3.5 h-3.5" style={{ color: activeColor.primary }} />
-                <span>Gramas (g)</span>
+                <span>{measurementUnit === 'ml' ? 'Mililitros (ml)' : 'Gramas (g)'}</span>
               </button>
             </div>
 
@@ -305,7 +305,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                       <span className="font-bold text-[#6F7C76] dark:text-[#A8B8B1] text-sm">{servingUnit}{portions > 1 && !servingUnit.endsWith('s') && !servingUnit.includes(' ') ? 's' : ''}</span>
                     </div>
                     <span className="text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1]">
-                      = {effectiveGrams} gramas no total
+                      = {effectiveGrams} {measurementUnit} no total
                     </span>
                   </div>
 
@@ -341,7 +341,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
             ) : (
               <div>
                 <div className="flex items-center justify-between mb-1.5 text-xs font-bold text-[#3F4B46] dark:text-[#EDF2EF]">
-                  <span>Peso em Gramas (g):</span>
+                  <span>Quantidade ({measurementUnit})</span>
                   <span className="text-[#6F7C76] dark:text-[#A8B8B1] text-[11px] font-semibold">
                     ≈ {(effectiveGrams / baseGrams).toFixed(1)} {servingUnit}s
                   </span>
@@ -365,7 +365,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                         onChange={(e) => setGrams(Math.max(1, parseInt(e.target.value, 10) || 0))}
                         className="w-20 text-center text-xl font-bold text-[#3F4B46] dark:text-[#EDF2EF] focus:outline-none bg-transparent"
                       />
-                      <span className="font-bold text-[#6F7C76] dark:text-[#A8B8B1] text-sm">gramas</span>
+                      <span className="font-bold text-[#6F7C76] dark:text-[#A8B8B1] text-sm">{measurementUnit}</span>
                     </div>
                     <span className="text-[10px] font-bold text-[#6F7C76] dark:text-[#A8B8B1]">
                       ≈ {(grams / baseGrams).toFixed(1)} {servingUnit}
@@ -396,7 +396,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                         backgroundColor: grams === pr ? activeColor.primary : undefined
                       }}
                     >
-                      {pr}g
+                      {pr} {measurementUnit}
                     </button>
                   ))}
                   <button
@@ -436,7 +436,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
               <span>Nutrição & Macros</span>
             </button>
 
-            <button
+            {!isLabel && <button
               onClick={() => setActiveTab('processing')}
               className={`pb-2.5 px-4 flex items-center gap-1.5 transition-colors relative flex-1 justify-center ${
                 activeTab === 'processing'
@@ -450,7 +450,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
             >
               <ShieldCheck className="w-4 h-4" />
               <span>Processamento (NOVA)</span>
-            </button>
+            </button>}
           </div>
 
           {/* TAB 1: Nutrição & Micronutrientes */}
@@ -497,7 +497,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
               </div>
 
               {/* Sub-nutrients Breakdown */}
-              <div className="bg-[#F7F4EE] dark:bg-[#18201D] rounded-2xl p-3.5 border border-[#AEBDB5]/30 dark:border-[#394842] space-y-2 text-xs">
+              {!isLabel && <div className="bg-[#F7F4EE] dark:bg-[#18201D] rounded-2xl p-3.5 border border-[#AEBDB5]/30 dark:border-[#394842] space-y-2 text-xs">
                 <h4 className="font-bold text-[#3F4B46] dark:text-[#EDF2EF]">Detalhamento Nutricional ({effectiveGrams}g)</h4>
                 <div className="flex justify-between py-1 border-b border-[#AEBDB5]/20 dark:border-[#394842] text-[#6F7C76] dark:text-[#A8B8B1]">
                   <span>Gorduras Saturadas</span>
@@ -519,12 +519,12 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
                   <span>Sódio Estimado</span>
                   <span className="font-bold text-[#3F4B46] dark:text-[#EDF2EF]">{sodium}mg</span>
                 </div>
-              </div>
+              </div>}
             </div>
           )}
 
           {/* TAB 2: Qualidade & Processamento (NOVA) */}
-          {activeTab === 'processing' && (
+          {!isLabel && activeTab === 'processing' && (
             <div className="space-y-3.5">
               {/* NOVA Official Classification Card */}
               <div className="p-4 rounded-2xl border border-[#AEBDB5]/30 dark:border-[#394842] bg-[#F7F4EE] dark:bg-[#18201D]">

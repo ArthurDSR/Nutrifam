@@ -41,6 +41,7 @@ export const WeightTab: React.FC<WeightTabProps> = ({
   const sortedEntries = [...weightEntries].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
+  const initialWeight = profile.startWeightKg > 0 ? profile.startWeightKg : sortedEntries[0]?.weightKg;
 
   const nowTime = new Date().getTime();
   const filteredEntries = sortedEntries.filter((e) => {
@@ -114,7 +115,7 @@ export const WeightTab: React.FC<WeightTabProps> = ({
             {t('profile.startWeight')}
           </span>
           <span className="text-lg font-black text-[#3F4B46] dark:text-[#EDF2EF] tracking-tight my-1">
-            {profile.startWeightKg} <span className="text-xs font-bold text-[#6F7C76] dark:text-[#A8B8B1]">kg</span>
+            {initialWeight ?? '—'} {initialWeight != null && <span className="text-xs font-bold text-[#6F7C76] dark:text-[#A8B8B1]">kg</span>}
           </span>
           <span className="text-[10px] font-semibold text-[#6F7C76] dark:text-[#A8B8B1]">
             Inicial

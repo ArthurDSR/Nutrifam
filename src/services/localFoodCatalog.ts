@@ -5,7 +5,7 @@ import { FoodItem } from '../types';
 import { isCatalogEligibleFood } from './foodCatalogPolicy';
 import { normalizeCatalogText } from './localFoodCatalogText';
 
-export const LOCAL_CATALOG_VERSION = '2026.09.5';
+export const LOCAL_CATALOG_VERSION = '2026.11.2';
 
 const DB_NAME = 'nutrifam-food-catalog';
 const DB_VERSION = 1;
@@ -38,12 +38,16 @@ const asCatalogFood = (food: FoodItem, catalogSource: CatalogSource): LocalCatal
 
 const deduplicate = (foods: LocalCatalogFood[]): LocalCatalogFood[] => {
   const seen = new Set<string>();
+  const seenIds = new Set<string>();
   return foods.filter((food) => {
+    // A translated label can be shared by different cuts or cooking methods.
+    // Keep the original description in the identity when the source supplies it.
     const key = food.barcode
       ? `barcode:${food.barcode}`
-      : `${food.normalizedName}:${food.servingGrams}`;
-    if (seen.has(key)) return false;
+      : `${food.normalizedName}:${normalizeCatalogText(food.sourceName || '')}:${food.servingGrams}`;
+    if (seen.has(key) || seenIds.has(food.id)) return false;
     seen.add(key);
+    seenIds.add(food.id);
     return true;
   });
 };
@@ -54,12 +58,16 @@ const STATIC_CATALOG = deduplicate([
   ...BRAZILIAN_FOODS.map((food) => asCatalogFood(food, 'brazilian'))
 ].filter(isCatalogEligibleFood));
 
+const BARCODE_INDEX = new Map(STATIC_CATALOG
+  .filter((food) => food.barcode)
+  .map((food) => [food.barcode!, food]));
+
 export const getLocalCatalogFoods = (): readonly LocalCatalogFood[] => STATIC_CATALOG;
 
 export const findLocalFoodByBarcode = (barcode: string): LocalCatalogFood | undefined => {
   const normalized = normalizeBarcode(barcode);
   if (!normalized) return undefined;
-  return STATIC_CATALOG.find((food) => food.barcode === normalized);
+  return BARCODE_INDEX.get(normalized);
 };
 
 const openCatalogDb = (): Promise<IDBDatabase | null> => {

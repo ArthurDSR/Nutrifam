@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { MobileFrame } from './components/layout/MobileFrame';
 import { BottomNavigation } from './components/layout/BottomNavigation';
 import { CalorieRingCard } from './components/journal/CalorieRingCard';
@@ -93,6 +94,16 @@ type AccountSnapshot = {
 
 const emptyAccountSnapshot = (): AccountSnapshot => ({ profile: null, logs: {}, weights: {}, foods: {} });
 
+// This key only coalesces events. Supabase still verifies the user and A2F.
+function sessionKey(session: Session): string {
+  try {
+    const payload = session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const { session_id, aal } = JSON.parse(atob(payload));
+    if (typeof session_id === 'string' && session_id) return JSON.stringify([session.user.id, session_id, aal]);
+  } catch { /* Without a session ID, coalesce only identical tokens. */ }
+  return JSON.stringify([session.user.id, session.access_token]);
+}
+
 function readCloudSnapshot(userId: string): AccountSnapshot {
   try {
     return { ...emptyAccountSnapshot(), ...JSON.parse(localStorage.getItem(`nutrifam_cloud_snapshot_${userId}`) || '{}') };
@@ -112,6 +123,8 @@ export const App: React.FC = () => {
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [syncConflictCount, setSyncConflictCount] = useState(0);
   const authEpochRef = useRef(0);
+  const observedSessionRef = useRef<{ userId: string; key: string } | null>(null);
+  const authAttemptRef = useRef<string | null>(null);
   const baselineRef = useRef<{ profile: string; logs: Record<string, string>; weights: Record<string, string>; foods: Record<string, string> } | null>(null);
   const cloudBaselineRef = useRef<AccountSnapshot>(emptyAccountSnapshot());
 
@@ -183,69 +196,77 @@ export const App: React.FC = () => {
   };
 
   const handleAuthSuccess = async (authUser: AuthUser) => {
-    const epoch = ++authEpochRef.current;
-    setAuthLoadError(null);
-    let mfaEnabled = false;
     if (!isSupabaseConfigured()) return;
-    if (navigator.onLine) {
-      const client = getSupabase();
-      const { data, error } = await client!.auth.getUser();
-      if (error || data.user?.id !== authUser.id) {
-        setAuthLoadError('Esta sessão não foi confirmada pelo Supabase. Entre novamente na conta correta.');
-        setMfaChecking(false);
-        return;
-      }
-      try {
-        const status = await getMfaStatus();
-        mfaEnabled = Boolean(status.factorId);
-        if (status.required) {
-          setMfaGateUser(authUser);
-          setMfaFactorId(status.factorId || null);
-          setMfaChecking(false);
-          return;
-        }
-      } catch {
-        setAuthLoadError('Não foi possível verificar a A2F. Tente novamente com conexão ativa.');
-        setMfaChecking(false);
-        return;
-      }
-    }
-    else if (localStorage.getItem('nutrifam_verified_account_id') !== authUser.id) return;
-    if (epoch !== authEpochRef.current) return;
-    migrateLegacyAccountCache(authUser.id);
-    cloudBaselineRef.current = readCloudSnapshot(authUser.id);
-    setLocalAuthUser(authUser);
-    if (navigator.onLine) localStorage.setItem('nutrifam_verified_account_id', authUser.id);
-    setIsAuthModalOpen(false);
-    const cached = getStoredProfile(authUser.id);
-    const cachedProfile: UserProfile = {
-      ...cached, id: authUser.id, email: authUser.email,
-      name: cached.name !== 'Meu Perfil' ? cached.name : (authUser.name || cached.name),
-      isTwoFactorEnabled: mfaEnabled
-    };
-    const cachedLogs = getStoredDayLogs(authUser.id);
-    const cachedWeights = getStoredWeightEntries(authUser.id);
-    const cachedFoods = getStoredCustomFoods(authUser.id);
-    if (!navigator.onLine) {
-      rememberBaseline(cachedProfile, cachedLogs, cachedWeights, cachedFoods);
-      cloudProfileOwnerRef.current = authUser.id;
-      setProfile(cachedProfile);
-      setDayLogs(cachedLogs);
-      setWeightEntries(cachedWeights);
-      setCustomFoods(cachedFoods);
-      setActiveUserId(authUser.id);
-      setSyncConflictCount(getSyncConflictCount(authUser.id));
-      setMfaChecking(false);
-      return;
-    }
+    const observed = observedSessionRef.current;
+    const online = navigator.onLine;
+    if (online ? observed?.userId !== authUser.id : observed && observed.userId !== authUser.id) return;
+    const identity = observed?.key ?? authUser.id;
+    const key = JSON.stringify([identity, online]);
+    if (authAttemptRef.current === key) return;
+    if (!online && authAttemptRef.current === JSON.stringify([identity, true])) return;
+    const epoch = ++authEpochRef.current;
+    authAttemptRef.current = key;
+    cloudProfileOwnerRef.current = null;
+    setActiveUserId(null);
+    setAuthLoadError(null);
+    setMfaError(null);
+    setMfaGateUser(null);
+    setMfaFactorId(null);
     setMfaChecking(true);
     try {
+      let mfaEnabled = false;
+      if (online) {
+        const client = getSupabase();
+        if (!client) throw new Error('Supabase indisponível.');
+        const { data, error } = await client.auth.getUser();
+        if (epoch !== authEpochRef.current) return;
+        if (error || data.user?.id !== authUser.id) {
+          throw new Error('Esta sessão não foi confirmada pelo Supabase. Entre novamente na conta correta.');
+        }
+        const status = await getMfaStatus();
+        if (epoch !== authEpochRef.current) return;
+        mfaEnabled = Boolean(status.factorId);
+        if (status.required) {
+          localStorage.removeItem('nutrifam_verified_account_id');
+          setMfaGateUser(authUser);
+          setMfaFactorId(status.factorId || null);
+          return;
+        }
+      } else if (localStorage.getItem('nutrifam_verified_account_id') !== authUser.id) {
+        throw new Error('Conecte-se à internet para confirmar esta sessão.');
+      }
+      if (epoch !== authEpochRef.current) return;
+      migrateLegacyAccountCache(authUser.id);
+      cloudBaselineRef.current = readCloudSnapshot(authUser.id);
+      setLocalAuthUser(authUser);
+      if (online) localStorage.setItem('nutrifam_verified_account_id', authUser.id);
+      setIsAuthModalOpen(false);
+      const cached = getStoredProfile(authUser.id);
+      const cachedLogs = getStoredDayLogs(authUser.id);
+      const cachedWeights = getStoredWeightEntries(authUser.id);
+      const cachedFoods = getStoredCustomFoods(authUser.id);
+      if (!online) {
+        const cachedProfile: UserProfile = {
+          ...cached, id: authUser.id, email: authUser.email,
+          name: cached.name !== 'Meu Perfil' ? cached.name : (authUser.name || cached.name)
+        };
+        rememberBaseline(cachedProfile, cachedLogs, cachedWeights, cachedFoods);
+        cloudProfileOwnerRef.current = authUser.id;
+        setProfile(cachedProfile);
+        setDayLogs(cachedLogs);
+        setWeightEntries(cachedWeights);
+        setCustomFoods(cachedFoods);
+        setActiveUserId(authUser.id);
+        setSyncConflictCount(getSyncConflictCount(authUser.id));
+        return;
+      }
       const client = getSupabase();
       if (!client) throw new Error('Supabase indisponível.');
       // The signup trigger runs only when auth.users is created. A manually
       // deleted profile must be recreated from server defaults, never cache.
       const { data: profileRow, error: lookupError } = await client.from('profiles')
         .select('id').eq('id', authUser.id).maybeSingle();
+      if (epoch !== authEpochRef.current) return;
       if (lookupError) throw new Error(`Consulta do perfil (${lookupError.code || 'sem código'}): ${lookupError.message}`);
       if (!profileRow) {
         const { error: createError } = await client.from('profiles').insert({
@@ -269,6 +290,7 @@ export const App: React.FC = () => {
       if (!remoteProfile) {
         const { data: visibleProfile, error: profileError } = await client.from('profiles')
           .select('id').eq('id', authUser.id).maybeSingle();
+        if (epoch !== authEpochRef.current) return;
         if (profileError) throw new Error(`Falha ao ler o perfil (${profileError.code || 'sem código'}): ${profileError.message}`);
         if (!visibleProfile) throw new Error('O login foi aceito, mas o perfil desta conta não está visível no Supabase. Verifique a política de acesso do perfil e a A2F.');
         throw new Error('O perfil existe no Supabase, mas seus dados não puderam ser interpretados pelo app.');
@@ -286,10 +308,12 @@ export const App: React.FC = () => {
       // pertence a este UUID; nunca o consideramos uma cópia confirmada do servidor.
       const nextLogs = remoteLogs ?? cachedLogs;
       const nextWeights = remoteWeights ?? cachedWeights;
-      const nextFoods = remoteFoods ?? cachedFoods;
+      const pendingFoods = getPendingChanges(authUser.id).flatMap((change) => change.kind === 'food' ? [change.value] : []);
+      const nextFoods = [...new Map([...(remoteFoods ?? cachedFoods), ...pendingFoods]
+        .map((food) => [food.id, food])).values()];
       rememberBaseline(nextProfile, nextLogs, nextWeights, nextFoods);
       const previousCloud = cloudBaselineRef.current;
-      rememberCloudBaseline(authUser.id, nextProfile, nextLogs, nextWeights, nextFoods);
+      rememberCloudBaseline(authUser.id, nextProfile, nextLogs, nextWeights, remoteFoods ?? cachedFoods);
       if (unavailable.length) {
         cloudBaselineRef.current = {
           ...cloudBaselineRef.current,
@@ -307,42 +331,24 @@ export const App: React.FC = () => {
       cloudProfileOwnerRef.current = authUser.id;
       setActiveUserId(authUser.id);
       setSyncConflictCount(getSyncConflictCount(authUser.id));
-      setMfaChecking(false);
       if (nextProfile.isOnboardingCompleted) setIsOnboardingSurveyOpen(false);
     } catch (error) {
       console.warn('Não foi possível confirmar os dados no Supabase:', error);
       if (epoch === authEpochRef.current) {
+        authAttemptRef.current = null;
         setAuthLoadError(error instanceof Error ? error.message :
           error && typeof error === 'object' && 'message' in error ? String(error.message) :
           'Não foi possível carregar o perfil da conta. Verifique a conexão e tente novamente.');
-        setMfaChecking(false);
       }
-    }
-  };
-
-  const checkMfaBeforeProfile = async (authUser: AuthUser) => {
-    setMfaGateUser(null);
-    setMfaError(null);
-    try {
-      const status = await getMfaStatus();
-      if (status.required) {
-        setMfaFactorId(status.factorId || null);
-        setMfaGateUser(authUser);
-        setMfaChecking(false);
-        return;
-      }
-      setMfaGateUser(null);
-      setMfaFactorId(null);
-      await handleAuthSuccess(authUser);
-    } catch (error) {
-      setAuthLoadError(error instanceof Error ? error.message : 'Não foi possível verificar a A2F.');
     } finally {
-      setMfaChecking(false);
+      if (epoch === authEpochRef.current) setMfaChecking(false);
     }
   };
 
   const handleLogout = async () => {
     ++authEpochRef.current;
+    authAttemptRef.current = null;
+    observedSessionRef.current = null;
     setActiveUserId(null);
     setSyncConflictCount(0);
     setUnavailableData([]);
@@ -383,10 +389,16 @@ export const App: React.FC = () => {
     if (isSupabaseConfigured()) {
       const client = getSupabase();
       if (client) {
-
+        let pendingAuth: ReturnType<typeof setTimeout> | undefined;
         const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
-          if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          if (session?.user && (
+            event === 'SIGNED_IN' || event === 'INITIAL_SESSION' ||
+            event === 'TOKEN_REFRESHED' || event === 'MFA_CHALLENGE_VERIFIED'
+          )) {
             const u = session.user;
+            const key = sessionKey(session);
+            if (observedSessionRef.current?.key !== key) ++authEpochRef.current;
+            observedSessionRef.current = { userId: u.id, key };
             const authUser: AuthUser = {
               id: u.id,
               email: u.email || '',
@@ -395,18 +407,19 @@ export const App: React.FC = () => {
               provider: (u.app_metadata?.provider as any) || 'email',
               isEmailVerified: Boolean(u.email_confirmed_at)
             };
-            setTimeout(() => {
-              if (!navigator.onLine && localStorage.getItem('nutrifam_verified_account_id') === authUser.id) {
-                void handleAuthSuccess(authUser);
-              } else {
-                void checkMfaBeforeProfile(authUser);
-              }
+            clearTimeout(pendingAuth);
+            pendingAuth = setTimeout(() => {
+              if (observedSessionRef.current?.key === key) void handleAuthSuccess(authUser);
             }, 0);
 
             if (window.location.hash && window.location.hash.includes('access_token')) {
               window.history.replaceState({}, document.title, window.location.pathname);
             }
           } else if (event === 'SIGNED_OUT') {
+            clearTimeout(pendingAuth);
+            observedSessionRef.current = null;
+            authAttemptRef.current = null;
+            cloudProfileOwnerRef.current = null;
             setLocalAuthUser(null);
             localStorage.removeItem('nutrifam_verified_account_id');
             setMfaGateUser(null);
@@ -424,7 +437,7 @@ export const App: React.FC = () => {
           } else if (event === 'INITIAL_SESSION' && !session) {
             const cachedUser = getLocalAuthUser();
             if (!navigator.onLine && cachedUser && localStorage.getItem('nutrifam_verified_account_id') === cachedUser.id) {
-              void handleAuthSuccess(cachedUser);
+              pendingAuth = setTimeout(() => void handleAuthSuccess(cachedUser), 0);
             } else {
               setMfaChecking(false);
             }
@@ -432,6 +445,7 @@ export const App: React.FC = () => {
         });
 
         return () => {
+          clearTimeout(pendingAuth);
           subscription?.unsubscribe();
         };
       }
@@ -976,9 +990,12 @@ export const App: React.FC = () => {
       note
     };
     setWeightEntries((prev) => [...prev, newEntry]);
+    const initialWeight = [...weightEntries, newEntry]
+      .sort((left, right) => left.date.localeCompare(right.date))[0].weightKg;
     setProfile((prev) => ({
       ...prev,
       // Uma pesagem retroativa compõe o histórico, mas não substitui o peso atual.
+      startWeightKg: prev.startWeightKg > 0 ? prev.startWeightKg : initialWeight,
       ...(date === getTodayDateString() ? { currentWeightKg: weight } : {}),
       gems: prev.gems + 30
     }));
@@ -987,7 +1004,7 @@ export const App: React.FC = () => {
 
   // Custom Food handler
   const handleCreateCustomFood = (food: FoodItem) => {
-    setCustomFoods((prev) => [food, ...prev]);
+    setCustomFoods((prev) => [food, ...prev.filter((existing) => existing.id !== food.id)]);
   };
 
   const handleSyncHealth = async (silent = false) => {
@@ -1089,12 +1106,14 @@ export const App: React.FC = () => {
   ) => {
     if (!activeUserId || profile.id !== activeUserId) return;
     setIsOnboardingSurveyOpen(false);
+    const oldestWeight = [...weightEntries].sort((left, right) => left.date.localeCompare(right.date))[0]?.weightKg;
 
     // 1. Update Profile
     const finalProfile: UserProfile = {
       ...completedProfile,
       id: activeUserId,
       email: profile.email,
+      startWeightKg: profile.startWeightKg > 0 ? profile.startWeightKg : oldestWeight ?? initialWeight,
       isOnboardingCompleted: true
     };
     setProfile(finalProfile);
@@ -1114,9 +1133,10 @@ export const App: React.FC = () => {
       weightKg: initialWeight,
       note: 'Peso inicial verificado na pesquisa'
     };
-    const newWeightEntries = [initialEntry];
-    setWeightEntries(newWeightEntries);
-    saveStoredWeightEntries(newWeightEntries, finalProfile.id);
+    if (weightEntries.length === 0 && !profile.isOnboardingCompleted) {
+      setWeightEntries([initialEntry]);
+      saveStoredWeightEntries([initialEntry], finalProfile.id);
+    }
 
     // 3. Update or create today's DayLog with newly calculated targets
     setDayLogs((prev) => {
@@ -1157,10 +1177,7 @@ export const App: React.FC = () => {
         const factorId = mfaFactorId || (await getMfaStatus()).factorId;
         if (!factorId) throw new Error('Fator A2F não encontrado.');
         await verifyTotp(factorId, mfaCode);
-        const user = mfaGateUser;
-        setMfaGateUser(null);
         setMfaCode('');
-        await handleAuthSuccess(user);
       } catch (error) {
         setMfaError(error instanceof Error ? error.message : 'Código inválido ou expirado.');
       }

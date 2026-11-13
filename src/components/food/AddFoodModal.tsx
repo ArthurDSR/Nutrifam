@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { X, ScanBarcode, Search, Camera, Sparkles, Utensils } from 'lucide-react';
-import { Meal, MealType, FoodItem, AddFoodSubTab, ProductEvaluation } from '../../types';
+import { Meal, MealType, FoodItem, AddFoodSubTab } from '../../types';
 import { FoodSearchView } from './FoodSearchView';
 import { BarcodeScannerView } from './BarcodeScannerView';
+import { NutritionLabelForm } from './NutritionLabelForm';
 import { QuickAddView } from './QuickAddView';
 import { PhotoScannerView } from './PhotoScannerView';
 import { MyFoodsView } from './MyFoodsView';
@@ -54,6 +55,20 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
   const { isDark, activeColor } = useTheme();
   const [activeTab, setActiveTab] = useState<AddFoodSubTab>(initialSubTab);
   const [selectedFoodForDetail, setSelectedFoodForDetail] = useState<FoodItem | null>(null);
+  const [labelBarcode, setLabelBarcode] = useState<string | null>(null);
+  const collectedLabels = customFoods.filter((food) => food.id.startsWith('label_') && food.barcode);
+  const exportLabels = () => {
+    const data = collectedLabels.map(({ name, brand, barcode, calories, protein, carbs, fat, fiber, servingSize, servingGrams }) =>
+      ({ id: barcode, name, brand, barcode, calories, protein, carbs, fat, fiber, servingSize, servingGrams }));
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'nutrifam-rotulos.json';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   const eatenCalories = Math.round(
     meal.items.reduce((acc, it) => acc + it.calories * it.servingsCount, 0)
@@ -109,29 +124,6 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
     setSelectedFoodForDetail(food);
   };
 
-  const handleBarcodeProductFound = (product: ProductEvaluation) => {
-    const foodItem: FoodItem = {
-      id: 'prod_' + product.barcode + '_' + Date.now(),
-      name: product.name,
-      brand: product.brand,
-      calories: product.nutrients.calories,
-      servingSize: product.portion || '100 g',
-      servingGrams: 100,
-      protein: product.nutrients.protein,
-      carbs: Number((100 - product.nutrients.protein - product.nutrients.fat).toFixed(1)),
-      fat: product.nutrients.fat,
-      fiber: product.nutrients.fiber,
-      colorDot: product.scoreColor === 'green' ? '#10b981' : product.scoreColor === 'yellow' ? '#f59e0b' : '#ef4444',
-      barcode: product.barcode,
-      imageUrl: product.imageUrl,
-      novaGroup: (product.processing?.novaGroup as 1 | 2 | 3 | 4) || 3,
-      healthScore: product.overallScore || 70,
-      preservativesCount: product.additives?.count || 0,
-      additives: product.additives?.items || ['Sem aditivos artificiais'],
-      healthyAlternative: product.alternatives?.[0]?.name
-    };
-    setSelectedFoodForDetail(foodItem);
-  };
 
   const handleFoodDetailAdded = (scaledFood: FoodItem) => {
     onAddFoodToMeal(meal.type, scaledFood);
@@ -316,11 +308,26 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
           />
         )}
 
-        {activeTab === 'barcode' && (
-          <BarcodeScannerView
-            onProductFound={handleBarcodeProductFound}
+        {activeTab === 'barcode' && (labelBarcode !== null ? (
+          <NutritionLabelForm
+            barcode={labelBarcode}
+            foods={customFoods}
+            onSave={onCreateCustomFood}
+            onClose={() => setLabelBarcode(null)}
+            vision={{
+              provider: aiProvider,
+              apiKey: aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'openai' ? openaiApiKey : openrouterApiKey,
+              model: aiProvider === 'gemini' ? geminiModel : aiProvider === 'openai' ? openaiModel : openrouterModel
+            }}
           />
-        )}
+        ) : (
+          <BarcodeScannerView
+            onProductFound={handleSelectFoodItem}
+            onRegisterLabel={setLabelBarcode}
+            findPersonalProduct={(code) => customFoods.find((food) => food.barcode === code)}
+            onExportLabels={collectedLabels.length ? exportLabels : undefined}
+          />
+        ))}
 
         {activeTab === 'quick_add' && (
           <QuickAddView

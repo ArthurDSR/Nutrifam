@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Loader2,
   ArrowRight,
-  KeyRound,
   RotateCw
 } from 'lucide-react';
 import {
@@ -23,7 +22,6 @@ import {
   verifyEmailOtp,
   AuthUser
 } from '../../services/authService';
-import { getMfaStatus, verifyTotp } from '../../services/mfaService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { useTheme } from '../../services/themeService';
 
@@ -52,11 +50,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isResetMode, setIsResetMode] = useState(false);
 
-  // A2F / 2FA Challenge State
-  const [isA2FChallenge, setIsA2FChallenge] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState('');
   const [pendingAuthUser, setPendingAuthUser] = useState<AuthUser | null>(null);
-  const [pendingFactorId, setPendingFactorId] = useState<string | null>(null);
 
   // Email Verification State
   const [isVerifyEmailMode, setIsVerifyEmailMode] = useState(false);
@@ -116,37 +110,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Submit Password / Register / Reset / A2F
+  // Submit Password / Register / Reset
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
-
-    // A2F Challenge flow
-    if (isA2FChallenge) {
-      if (twoFactorCode.trim().length !== 6) {
-        setErrorMsg('O código de dois fatores deve conter 6 dígitos.');
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        if (!pendingFactorId) throw new Error('Fator A2F não encontrado. Entre novamente.');
-        await verifyTotp(pendingFactorId, twoFactorCode);
-        setIsLoading(false);
-        setSuccessMsg('Autenticação de Dois Fatores confirmada!');
-        setTimeout(() => {
-          if (pendingAuthUser) {
-            onAuthSuccess(pendingAuthUser);
-          }
-          onClose();
-        }, 700);
-      } catch (error) {
-        setIsLoading(false);
-        setErrorMsg(error instanceof Error ? error.message : 'Código A2F incorreto ou expirado.');
-      }
-      return;
-    }
 
     // Email OTP Verification flow
     if (isVerifyEmailMode) {
@@ -220,27 +188,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(false);
 
     if (res.success && res.user) {
-      // Check if user has A2F enabled
-      if (isSupabase) {
-        try {
-          const status = await getMfaStatus();
-          if (status.required && status.factorId) {
-            setPendingAuthUser(res.user);
-            setPendingFactorId(status.factorId);
-            setIsA2FChallenge(true);
-            setSuccessMsg('Confirme seu código de dois fatores.');
-            return;
-          }
-          if (status.required) {
-            setErrorMsg('Há um segundo fator cadastrado que este app não consegue verificar. Contate o suporte.');
-            return;
-          }
-        } catch (error) {
-          setErrorMsg(error instanceof Error ? error.message : 'Não foi possível verificar a A2F.');
-          return;
-        }
-      }
-
       setSuccessMsg(res.message);
       setTimeout(() => {
         onAuthSuccess(res.user!);
@@ -280,18 +227,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md mb-2.5"
             style={{ backgroundColor: activeColor.primary }}
           >
-            {isA2FChallenge ? (
-              <KeyRound className="w-7 h-7 stroke-[2.2]" />
-            ) : isVerifyEmailMode ? (
+            {isVerifyEmailMode ? (
               <Mail className="w-7 h-7 stroke-[2.2]" />
             ) : (
               <ShieldCheck className="w-7 h-7 stroke-[2.2]" />
             )}
           </div>
           <h3 className="text-xl font-extrabold text-[#3F4B46] dark:text-[#EDF2EF]">
-            {isA2FChallenge
-              ? 'Verificação A2F'
-              : isVerifyEmailMode
+            {isVerifyEmailMode
               ? 'Verifique seu E-mail'
               : isResetMode
               ? 'Recuperar Senha'
@@ -300,9 +243,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               : 'Criar Conta no NutriFam'}
           </h3>
           <p className="text-xs text-[#6F7C76] dark:text-[#A8B8B1] max-w-xs mt-1">
-            {isA2FChallenge
-              ? 'Sua conta está protegida com autenticação em dois fatores. Digite o código de 6 dígitos do app.'
-              : isVerifyEmailMode
+            {isVerifyEmailMode
               ? `Enviamos as instruções de confirmação para ${email || 'seu e-mail'}.`
               : isResetMode
               ? 'Digite o e-mail cadastrado para redefinir sua senha com segurança.'
@@ -313,7 +254,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Social Login Buttons (Google & Apple) */}
-        {!isResetMode && !isA2FChallenge && !isVerifyEmailMode && (
+        {!isResetMode && !isVerifyEmailMode && (
           <div className="space-y-2.5 mb-4">
             {/* Google Button */}
             <button
@@ -369,7 +310,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         {/* Tab Switcher (Login vs Criar Conta) */}
-        {!isResetMode && !isA2FChallenge && !isVerifyEmailMode && (
+        {!isResetMode && !isVerifyEmailMode && (
           <div className="flex bg-[#F7F4EE] dark:bg-[#18201D] border border-[#AEBDB5]/30 dark:border-[#394842] p-1 rounded-full mb-4">
             <button
               type="button"
@@ -423,51 +364,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* MAIN FORM */}
         <form onSubmit={handleSubmit} className="space-y-3.5">
-          {/* CASE 1: A2F / 2FA Challenge Mode */}
-          {isA2FChallenge ? (
-            <div className="space-y-4 py-2">
-              <div className="bg-[#ECEFE7] dark:bg-[#18201D] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-2xl p-4 text-center">
-                <p className="text-xs font-bold text-[#3F4B46] dark:text-[#EDF2EF] mb-1">
-                  Código de Autenticação em Dois Fatores
-                </p>
-                <p className="text-[11px] text-[#6F7C76] dark:text-[#A8B8B1] leading-snug">
-                  Abra o Google Authenticator ou Apple Passwords e digite o código de 6 dígitos correspondente ao NutriFam:
-                </p>
-                <div className="mt-3">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    autoFocus
-                    value={twoFactorCode}
-                    onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="000000"
-                    className="w-full max-w-[220px] mx-auto p-3 text-center text-2xl font-mono font-black tracking-[0.4em] rounded-xl border border-[#AEBDB5]/30 dark:border-[#394842] focus:outline-none bg-white dark:bg-[#232D29] text-[#3F4B46] dark:text-[#EDF2EF]"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading || twoFactorCode.trim().length !== 6}
-                className="w-full py-3.5 px-4 rounded-full text-white font-bold text-sm shadow-sm disabled:opacity-50 transition-all flex items-center justify-center gap-2 active:scale-98"
-                style={{ backgroundColor: activeColor.primary }}
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                <span>Confirmar Acesso Seguro</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsA2FChallenge(false);
-                  setTwoFactorCode('');
-                }}
-                className="w-full text-center text-xs font-bold text-[#6F7C76] dark:text-[#A8B8B1] hover:text-[#3F4B46] dark:hover:text-[#EDF2EF] block"
-              >
-                Voltar ao Login
-              </button>
-            </div>
-          ) : isVerifyEmailMode ? (
+          {isVerifyEmailMode ? (
             /* CASE 2: Email Verification Mode */
             <div className="space-y-4 py-2">
               <div className="bg-[#ECEFE7] dark:bg-[#18201D] border border-[#AEBDB5]/30 dark:border-[#394842] rounded-2xl p-4 text-center">
